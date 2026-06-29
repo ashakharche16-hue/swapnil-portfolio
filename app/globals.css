@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Brand palette (from CLAUDE.md). Dark is the default.
+ * In Slice 2 these become database-driven; for now they live here.
+ */
+:root {
+  --color-ink: #0b0f1a;
+  --color-elevated: #11172a;
+  --color-border: #1f2535;
+  --color-text: #e6e9f2;
+  --color-muted: #8892b0;
+  --color-accent: #7cc5ff;
+  --color-signal: #4ade80;
+}
+
+.light {
+  --color-ink: #fafaf7;
+  --color-elevated: #ffffff;
+  --color-border: #e3e3dc;
+  --color-text: #0b0f1a;
+  --color-muted: #5b6478;
+  --color-accent: #1d4ed8;
+  --color-signal: #16a34a;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-ink);
+    color: var(--color-text);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Visible focus rings for keyboard navigation (WCAG). */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
