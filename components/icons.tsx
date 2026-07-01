@@ -70,6 +70,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M22 10v6" />
     </>
   ),
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  close: <path d="M18 6 6 18M6 6l12 12" />,
+  "arrow-up": (
+    <>
+      <path d="M12 19V5" />
+      <path d="m5 12 7-7 7 7" />
+    </>
+  ),
 };
 
 // Brand/solid glyphs render filled rather than stroked.

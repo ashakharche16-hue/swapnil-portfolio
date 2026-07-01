@@ -9,6 +9,7 @@ import { AIEngineering } from "@/components/sections/AIEngineering";
 import { Capabilities } from "@/components/sections/Capabilities";
 import { Recognition } from "@/components/sections/Recognition";
 import { Contact } from "@/components/sections/Contact";
+import { BackToTop } from "@/components/ui/BackToTop";
 
 export default function Home() {
   return (
@@ -26,6 +27,7 @@ export default function Home() {
         <Contact />
       </main>
       <Footer />
+      <BackToTop />
     </>
   );
 }

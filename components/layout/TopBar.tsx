@@ -1,6 +1,7 @@
 import { seed } from "@/db/seed";
 import { Icon } from "@/components/icons";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MobileNav } from "@/components/layout/MobileNav";
 
 export function TopBar() {
   const { identity, nav } = seed;
@@ -8,13 +9,7 @@ export function TopBar() {
   return (
     <header className="topbar">
       <div className="wrap topbar-inner">
-        <a href="#top" className="mark" aria-label={`${identity.name} — home`}>
-          <span className="mark-dot" aria-hidden="true" />
-          <span className="mark-label">
-            <span className="for">{identity.initials}</span>{" "}
-            <span className="available">/ {identity.availabilityLabel}</span>
-          </span>
-        </a>
+        <MobileNav links={nav} />
 
         <nav className="primary" aria-label="Primary">
           {nav.map((link) => (
@@ -30,8 +25,8 @@ export function TopBar() {
             className="icon-btn"
             href={identity.resumeUrl}
             download
-            aria-label="Download Resume (PDF)"
-            title="Download Resume"
+            aria-label="Download résumé (PDF)"
+            title="Download résumé"
           >
             <Icon name="download" />
           </a>

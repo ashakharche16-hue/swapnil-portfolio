@@ -23,6 +23,7 @@ export const seed: SiteContent = {
   },
 
   nav: [
+    { label: "home", href: "#top" },
     { label: "work", href: "#work" },
     { label: "experience", href: "#experience" },
     { label: "skills", href: "#skills" },
