@@ -1,10 +1,10 @@
-import { seed } from "@/db/seed";
+import type { ExperienceContent } from "@/types/content";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { RichText } from "@/components/ui/RichText";
 
-export function Experience() {
-  const { experience } = seed;
+export function Experience({ data }: { data: ExperienceContent }) {
+  const experience = data;
 
   return (
     <section className="block" id="experience">

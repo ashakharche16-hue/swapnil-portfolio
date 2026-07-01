@@ -1,10 +1,10 @@
-import { seed } from "@/db/seed";
+import type { WorkContent } from "@/types/content";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { RichText } from "@/components/ui/RichText";
 
-export function SelectedWork() {
-  const { work } = seed;
+export function SelectedWork({ data }: { data: WorkContent }) {
+  const work = data;
 
   return (
     <section className="block" id="work">

@@ -1,8 +1,7 @@
 import { Fragment } from "react";
-import { seed } from "@/db/seed";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHead } from "@/components/ui/SectionHead";
-import type { RecItem } from "@/types/content";
+import type { RecItem, RecognitionContent } from "@/types/content";
 
 function RecRow({ item }: { item: RecItem }) {
   return (
@@ -13,8 +12,8 @@ function RecRow({ item }: { item: RecItem }) {
   );
 }
 
-export function Recognition() {
-  const { recognition } = seed;
+export function Recognition({ data }: { data: RecognitionContent }) {
+  const recognition = data;
 
   return (
     <section className="block" id="recognition">

@@ -1,11 +1,17 @@
 import { Fragment } from "react";
-import { seed } from "@/db/seed";
+import type { ContactContent, SiteIdentity } from "@/types/content";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHead } from "@/components/ui/SectionHead";
 import { Icon } from "@/components/icons";
 
-export function Contact() {
-  const { contact, identity } = seed;
+export function Contact({
+  data,
+  identity,
+}: {
+  data: ContactContent;
+  identity: SiteIdentity;
+}) {
+  const contact = data;
 
   return (
     <section className="block" id="contact">

@@ -9,9 +9,11 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:seed": "tsx scripts/seed-db.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.0",
     "framer-motion": "^12.42.0",
     "next": "14.2.35",
     "react": "^18",
@@ -21,6 +23,7 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "dotenv": "^17.4.2",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "eslint-config-prettier": "^10.1.8",
@@ -28,6 +31,7 @@
     "prettier": "^3.9.0",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

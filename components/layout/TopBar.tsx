@@ -1,11 +1,15 @@
-import { seed } from "@/db/seed";
+import type { NavLink, SiteIdentity } from "@/types/content";
 import { Icon } from "@/components/icons";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MobileNav } from "@/components/layout/MobileNav";
 
-export function TopBar() {
-  const { identity, nav } = seed;
-
+export function TopBar({
+  identity,
+  nav,
+}: {
+  identity: SiteIdentity;
+  nav: NavLink[];
+}) {
   return (
     <header className="topbar">
       <div className="wrap topbar-inner">

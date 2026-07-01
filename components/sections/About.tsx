@@ -1,9 +1,9 @@
-import { seed } from "@/db/seed";
+import type { AboutContent } from "@/types/content";
 import { Reveal } from "@/components/ui/Reveal";
 import { RichText } from "@/components/ui/RichText";
 
-export function About() {
-  const { about } = seed;
+export function About({ data }: { data: AboutContent }) {
+  const about = data;
 
   return (
     <section className="block" id="about">

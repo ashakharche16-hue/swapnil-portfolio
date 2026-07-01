@@ -1,8 +1,8 @@
-import { seed } from "@/db/seed";
+import type { Metric } from "@/types/content";
 import { Reveal } from "@/components/ui/Reveal";
 
-export function Metrics() {
-  const { metrics } = seed;
+export function Metrics({ data }: { data: Metric[] }) {
+  const metrics = data;
 
   return (
     <section className="wrap" aria-label="Career metrics">

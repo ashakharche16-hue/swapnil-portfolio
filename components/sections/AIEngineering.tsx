@@ -1,9 +1,9 @@
-import { seed } from "@/db/seed";
+import type { AIContent } from "@/types/content";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHead } from "@/components/ui/SectionHead";
 
-export function AIEngineering() {
-  const { ai } = seed;
+export function AIEngineering({ data }: { data: AIContent }) {
+  const ai = data;
 
   return (
     <section className="block" id="ai">

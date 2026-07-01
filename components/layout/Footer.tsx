@@ -1,7 +1,7 @@
-import { seed } from "@/db/seed";
+import type { FooterContent } from "@/types/content";
 
-export function Footer() {
-  const { footer } = seed;
+export function Footer({ data }: { data: FooterContent }) {
+  const footer = data;
   const year = new Date().getFullYear();
 
   return (

@@ -1,11 +1,11 @@
 import { Fragment } from "react";
-import { seed } from "@/db/seed";
+import type { HeroContent } from "@/types/content";
 import { Icon } from "@/components/icons";
 import { RichText } from "@/components/ui/RichText";
 import { RotatingText } from "@/components/ui/RotatingText";
 
-export function Hero() {
-  const { hero } = seed;
+export function Hero({ data }: { data: HeroContent }) {
+  const hero = data;
 
   return (
     <section className="hero wrap" id="top" aria-label="Introduction">
