@@ -6,15 +6,36 @@ import type {
   ExperienceContent,
   FooterContent,
   HeroContent,
+  LayoutItem,
   Metric,
   NavLink,
   RecognitionContent,
   SectionHeading,
+  SectionKey,
   SiteContent,
   SiteIdentity,
   SkillsContent,
   WorkContent,
 } from "@/types/content";
+
+/** Public site content plus the order/visibility of body sections. */
+export type PublicSite = SiteContent & { layout: LayoutItem[] };
+
+const BODY_KEYS: SectionKey[] = [
+  "metrics",
+  "about",
+  "experience",
+  "work",
+  "ai",
+  "skills",
+  "recognition",
+  "contact",
+];
+
+const DEFAULT_LAYOUT: LayoutItem[] = BODY_KEYS.map((key) => ({
+  key,
+  visible: true,
+}));
 
 /**
  * Single entry point for public-site content. Reads from Supabase when
@@ -22,9 +43,9 @@ import type {
  * always renders. Components never touch Supabase directly — they go through
  * this layer (per CLAUDE.md).
  */
-export async function getSiteContent(): Promise<SiteContent> {
+export async function getSiteContent(): Promise<PublicSite> {
   const supabase = getSupabaseClient();
-  if (!supabase) return seed;
+  if (!supabase) return { ...seed, layout: DEFAULT_LAYOUT };
 
   try {
     const [profileRes, sectionsRes] = await Promise.all([
@@ -44,17 +65,32 @@ export async function getSiteContent(): Promise<SiteContent> {
         "[content] Supabase read failed, using seed:",
         profileRes.error ?? sectionsRes.error,
       );
-      return seed;
+      return { ...seed, layout: DEFAULT_LAYOUT };
     }
 
-    return assemble(
-      profileRes.data as ProfileRow,
-      sectionsRes.data as SectionRow[],
-    );
+    const rows = sectionsRes.data as SectionRow[];
+    return {
+      ...assemble(profileRes.data as ProfileRow, rows),
+      layout: buildLayout(rows),
+    };
   } catch (err) {
     console.error("[content] Supabase read threw, using seed:", err);
-    return seed;
+    return { ...seed, layout: DEFAULT_LAYOUT };
   }
+}
+
+function buildLayout(rows: SectionRow[]): LayoutItem[] {
+  const body = rows
+    .filter((r) => (BODY_KEYS as string[]).includes(r.key))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    .map((r) => ({ key: r.key as SectionKey, visible: r.visible }));
+
+  // Ensure every body section is represented (missing rows default to visible).
+  const seen = new Set(body.map((b) => b.key));
+  for (const key of BODY_KEYS) {
+    if (!seen.has(key)) body.push({ key, visible: true });
+  }
+  return body;
 }
 
 // --- DB row shapes (JSONB columns are dynamically shaped, hence the casts) ---
@@ -71,6 +107,7 @@ interface SectionRow {
   heading: SectionHeading | null;
   content: Record<string, unknown>;
   visible: boolean;
+  sort_order: number;
 }
 
 function assemble(profile: ProfileRow, rows: SectionRow[]): SiteContent {

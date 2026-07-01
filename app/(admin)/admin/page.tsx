@@ -28,16 +28,19 @@ export default function AdminHome() {
         >
           <h2 className="font-medium text-body">Profile</h2>
           <p className="mt-1 text-sm text-muted">
-            Name, headline, rotating roles, and contact identity.
+            Name, headline, rotating roles, contact identity, and résumé upload.
           </p>
         </Link>
 
-        <div className="rounded-xl border border-dashed border-hairline p-5 text-dim">
-          <h2 className="font-medium">More editors</h2>
-          <p className="mt-1 text-sm">
-            About, Experience, Work, Skills, and the rest arrive in Slice 4.
+        <Link
+          href="/admin/sections"
+          className="rounded-xl border border-hairline bg-elev p-5 transition-colors hover:border-accent"
+        >
+          <h2 className="font-medium text-body">Sections</h2>
+          <p className="mt-1 text-sm text-muted">
+            Edit every section, reorder them, and show or hide them.
           </p>
-        </div>
+        </Link>
       </div>
     </div>
   );

@@ -86,3 +86,40 @@ export async function saveProfile(
   revalidatePath("/admin/profile");
   return { ok: true };
 }
+
+export type UploadResult =
+  { ok: true; url: string } | { ok: false; error: string };
+
+/**
+ * Uploads the résumé PDF to the public `media` Storage bucket and returns its
+ * public URL (to be saved into identity.resumeUrl). Requires a bucket named
+ * `media` (public) in Supabase Storage.
+ */
+export async function uploadResume(formData: FormData): Promise<UploadResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Not authenticated." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { ok: false, error: "No file provided." };
+  if (file.type !== "application/pdf")
+    return { ok: false, error: "File must be a PDF." };
+  if (file.size > 10 * 1024 * 1024)
+    return { ok: false, error: "File must be under 10 MB." };
+
+  let admin;
+  try {
+    admin = getSupabaseAdmin();
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+
+  const path = "resume/Swapnil_Kharche_Resume.pdf";
+  const { error } = await admin.storage.from("media").upload(path, file, {
+    upsert: true,
+    contentType: "application/pdf",
+  });
+  if (error) return { ok: false, error: error.message };
+
+  const { data } = admin.storage.from("media").getPublicUrl(path);
+  return { ok: true, url: data.publicUrl };
+}

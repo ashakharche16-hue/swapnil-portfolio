@@ -156,3 +156,12 @@ create policy "public rw rag_documents" on rag_documents for all using (true) wi
 
 drop policy if exists "public rw rag_chunks" on rag_chunks;
 create policy "public rw rag_chunks" on rag_chunks for all using (true) with check (true);
+
+-- ============================================================================
+-- Storage — public `media` bucket for uploads (résumé PDF, images).
+-- Uploads happen server-side via the service role; the bucket is public so the
+-- files are readable by anyone with the URL.
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('media', 'media', true)
+on conflict (id) do nothing;

@@ -214,3 +214,19 @@ export interface SiteContent {
   contact: ContactContent;
   footer: FooterContent;
 }
+
+/** Reorderable / hideable body sections (Hero, footer, nav are fixed). */
+export type SectionKey =
+  | "metrics"
+  | "about"
+  | "experience"
+  | "work"
+  | "ai"
+  | "skills"
+  | "recognition"
+  | "contact";
+
+export interface LayoutItem {
+  key: SectionKey;
+  visible: boolean;
+}

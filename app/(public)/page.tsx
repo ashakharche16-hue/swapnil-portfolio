@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+import type { SectionKey } from "@/types/content";
 import { getSiteContent } from "@/services/content";
 import { TopBar } from "@/components/layout/TopBar";
 import { Footer } from "@/components/layout/Footer";
@@ -19,19 +21,28 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const content = await getSiteContent();
 
+  // Body sections render in the DB-configured order, skipping hidden ones.
+  const sections: Record<SectionKey, React.ReactNode> = {
+    metrics: <Metrics data={content.metrics} />,
+    about: <About data={content.about} />,
+    experience: <Experience data={content.experience} />,
+    work: <SelectedWork data={content.work} />,
+    ai: <AIEngineering data={content.ai} />,
+    skills: <Capabilities data={content.skills} />,
+    recognition: <Recognition data={content.recognition} />,
+    contact: <Contact data={content.contact} identity={content.identity} />,
+  };
+
   return (
     <>
       <TopBar identity={content.identity} nav={content.nav} />
       <main>
         <Hero data={content.hero} />
-        <Metrics data={content.metrics} />
-        <About data={content.about} />
-        <Experience data={content.experience} />
-        <SelectedWork data={content.work} />
-        <AIEngineering data={content.ai} />
-        <Capabilities data={content.skills} />
-        <Recognition data={content.recognition} />
-        <Contact data={content.contact} identity={content.identity} />
+        {content.layout
+          .filter((item) => item.visible)
+          .map((item) => (
+            <Fragment key={item.key}>{sections[item.key]}</Fragment>
+          ))}
       </main>
       <Footer data={content.footer} />
       <BackToTop />

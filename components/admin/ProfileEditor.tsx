@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ProfileRow } from "@/services/admin";
 import {
   saveProfile,
+  uploadResume,
   type ProfileFormValues,
 } from "@/app/(admin)/admin/profile/actions";
 
@@ -53,6 +54,26 @@ export function ProfileEditor({ initial }: { initial: ProfileRow }) {
     "idle",
   );
   const [error, setError] = useState<string | null>(null);
+  const [upload, setUpload] = useState<
+    | { state: "idle" | "uploading" }
+    | { state: "error"; message: string }
+    | { state: "done" }
+  >({ state: "idle" });
+
+  async function onResumeFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUpload({ state: "uploading" });
+    const fd = new FormData();
+    fd.append("file", file);
+    const result = await uploadResume(fd);
+    if (result.ok) {
+      set("resumeUrl", result.url);
+      setUpload({ state: "done" });
+    } else {
+      setUpload({ state: "error", message: result.error });
+    }
+  }
 
   function set<K extends keyof typeof values>(key: K, value: string) {
     setValues((v) => ({ ...v, [key]: value }));
@@ -207,12 +228,36 @@ export function ProfileEditor({ initial }: { initial: ProfileRow }) {
               onChange={(e) => set("linkedinHandle", e.target.value)}
             />
           </Field>
-          <Field label="Résumé URL">
+          <Field
+            label="Résumé URL"
+            hint="Paste a URL, or upload a PDF below to set it automatically."
+          >
             <input
               className={inputCls}
               value={values.resumeUrl}
               onChange={(e) => set("resumeUrl", e.target.value)}
             />
+          </Field>
+          <Field label="Upload résumé (PDF → Storage)">
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={onResumeFile}
+              className="text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-hairline file:bg-soft file:px-3 file:py-1.5 file:text-body"
+            />
+            {upload.state === "uploading" && (
+              <span className="text-xs text-dim">Uploading…</span>
+            )}
+            {upload.state === "done" && (
+              <span className="text-xs text-signal">
+                ✓ Uploaded — remember to Save.
+              </span>
+            )}
+            {upload.state === "error" && (
+              <span role="alert" className="text-xs text-red-400">
+                {upload.message}
+              </span>
+            )}
           </Field>
         </div>
       </section>

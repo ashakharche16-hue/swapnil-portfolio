@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LoginForm } from "@/components/admin/LoginForm";
 
 export const metadata: Metadata = {
@@ -23,6 +24,13 @@ export default function LoginPage() {
         <Suspense fallback={null}>
           <LoginForm />
         </Suspense>
+
+        <Link
+          href="/"
+          className="mt-6 inline-block font-mono text-xs text-muted transition-colors hover:text-body"
+        >
+          ← Back to site
+        </Link>
       </div>
     </main>
   );
