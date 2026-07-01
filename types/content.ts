@@ -23,7 +23,8 @@ export type IconName =
   | "mail"
   | "phone"
   | "linkedin"
-  | "arrow-up-right";
+  | "arrow-up-right"
+  | "graduation-cap";
 
 export interface NavLink {
   label: string;

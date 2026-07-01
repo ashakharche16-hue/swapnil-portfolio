@@ -63,6 +63,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M7 7h10v10" />
     </>
   ),
+  "graduation-cap": (
+    <>
+      <path d="M22 10 12 5 2 10l10 5 10-5z" />
+      <path d="M6 12v5c0 1.66 2.69 3 6 3s6-1.34 6-3v-5" />
+      <path d="M22 10v6" />
+    </>
+  ),
 };
 
 // Brand/solid glyphs render filled rather than stroked.

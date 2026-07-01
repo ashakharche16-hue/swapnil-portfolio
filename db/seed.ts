@@ -31,7 +31,7 @@ export const seed: SiteContent = {
   ],
 
   hero: {
-    eyebrow: ["SWAPNIL KHARCHE", "PUNE · IN", "EST. 2012"],
+    eyebrow: ["SWAPNIL KHARCHE", "PUNE · IN", "OPEN TO WORK"],
     name: [{ text: "Hey, I'm Swapnil," }],
     rotatingRoles: [
       "Problem Solver!",
@@ -46,6 +46,7 @@ export const seed: SiteContent = {
       { icon: "pin", label: "Pune, India" },
       { icon: "calendar", label: "12+ years in industry" },
       { icon: "building", label: "Deloitte Consulting LLP" },
+      { icon: "graduation-cap", label: "M.S. CS · Florida State University" },
       { icon: "check-circle", label: "Open to senior roles" },
     ],
     ctas: [
