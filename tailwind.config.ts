@@ -15,13 +15,16 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "var(--color-ink)",
-        elevated: "var(--color-elevated)",
-        hairline: "var(--color-border)",
-        body: "var(--color-text)",
-        muted: "var(--color-muted)",
-        accent: "var(--color-accent)",
-        signal: "var(--color-signal)",
+        bg: "var(--bg)",
+        elev: "var(--bg-elev)",
+        soft: "var(--bg-soft)",
+        hairline: "var(--border)",
+        "hairline-strong": "var(--border-strong)",
+        body: "var(--text)",
+        muted: "var(--text-muted)",
+        dim: "var(--text-dim)",
+        accent: "var(--accent)",
+        signal: "var(--signal)",
       },
       fontFamily: {
         serif: ["var(--font-fraunces)", "Georgia", "serif"],

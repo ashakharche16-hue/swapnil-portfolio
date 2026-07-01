@@ -1,23 +1,31 @@
+import { TopBar } from "@/components/layout/TopBar";
+import { Footer } from "@/components/layout/Footer";
+import { Hero } from "@/components/sections/Hero";
+import { Metrics } from "@/components/sections/Metrics";
+import { About } from "@/components/sections/About";
+import { Experience } from "@/components/sections/Experience";
+import { SelectedWork } from "@/components/sections/SelectedWork";
+import { AIEngineering } from "@/components/sections/AIEngineering";
+import { Capabilities } from "@/components/sections/Capabilities";
+import { Recognition } from "@/components/sections/Recognition";
+import { Contact } from "@/components/sections/Contact";
+
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-      <p className="font-mono text-xs uppercase tracking-[0.25em] text-accent">
-        Portfolio · in progress
-      </p>
-
-      <h1 className="mt-6 font-serif text-4xl font-semibold tracking-tight text-body sm:text-6xl">
-        Swapnil Kharche
-      </h1>
-
-      <p className="mt-4 max-w-xl font-sans text-base text-muted sm:text-lg">
-        Software Development Manager &amp; Technical Lead — 12+ years
-        modernizing mission-critical platforms.
-      </p>
-
-      <div className="mt-10 flex items-center gap-2 font-mono text-xs text-muted">
-        <span className="inline-block h-2 w-2 rounded-full bg-signal" />
-        Slice 0 deployed — building the full site next
-      </div>
-    </main>
+    <>
+      <TopBar />
+      <main>
+        <Hero />
+        <Metrics />
+        <About />
+        <Experience />
+        <SelectedWork />
+        <AIEngineering />
+        <Capabilities />
+        <Recognition />
+        <Contact />
+      </main>
+      <Footer />
+    </>
   );
 }
