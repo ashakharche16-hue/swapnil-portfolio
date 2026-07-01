@@ -132,7 +132,6 @@ Foundation first, so deployment never becomes the late surprise.
 
 - Create Supabase project + schema in `/db/schema.sql`.
 - Core tables: `profile`, `sections` (a typed, ordered, flexible content model so Experience/Projects/Skills/Certs/Awards/Testimonials all share a consistent shape — avoids 30 brittle tables), `blog_posts`, `contact_submissions`, `analytics_events`.
-- Also enable the `pgvector` extension and add `rag_documents` + `rag_chunks` (with a `vector` embedding column) plus a `match_chunks` cosine-similarity RPC — groundwork for the Slice 4.5 live RAG demo, added now to avoid a later migration.
 - `/services` data layer reads content from Supabase.
 - Seed the DB from Slice 1's seed file.
 - Switch the public site to read from the DB.
@@ -152,25 +151,6 @@ Foundation first, so deployment never becomes the late surprise.
 - Image/photo/PDF uploads → Supabase Storage.
 - Reorder + show/hide sections.
 - **Done when:** the entire site is editable from the dashboard, zero code.
-
-### Slice 4.5 — Live RAG demo (interactive "ask my documents")
-
-An interactive demo that proves the RAG expertise behind the "RAG Documentation Assistant" case study: a visitor uploads a PDF and asks questions answered **from its contents, with citations**. Buildable any time after **Slice 2** (needs `pgvector`); recommended **after Slice 4** so the spine ships first. **Independent of Slice 9** — OCR is handled here with Tesseract, not the parser service.
-
-**Zero-cost stack (locked):**
-
-- Text-based PDFs: **`unpdf`** (Node library) for extraction — no LLM needed.
-- Scanned / image PDFs: **Tesseract OCR** (`tesseract.js`) — fully local, no API, no keys.
-- Embeddings: **local Transformers.js** (`bge-small-en` / `all-MiniLM-L6-v2`) — no keys, no cost.
-- Vector store: **Supabase `pgvector`** (`rag_documents` + `rag_chunks`, provisioned in Slice 2).
-- Generation: **Groq** free tier (e.g. Llama 3.3 70B — confirm current model at build time), streamed. `GROQ_API_KEY` server-side only.
-- Hosting: Vercel Hobby + Supabase free tier. **Net cost: $0.**
-
-**Flow:** upload → validate (PDF, ≤10 MB, page cap) → extract (`unpdf`; Tesseract fallback for scans) → chunk (~800 tokens, ~100 overlap) → embed (local) → store in `rag_chunks` scoped to a `document_id` → question → embed → `pgvector` top-k (`match_chunks` RPC, cosine) → prompt Groq with retrieved context (system: _answer only from context; otherwise say you don't know_) → stream the answer with citations.
-
-**Guardrails (public demo — non-negotiable):** per-IP rate limiting (Upstash), max questions/session, 24h auto-expiry of docs/chunks, strict file validation, prompt-injection mitigation, secrets server-side only, and cost caps that stay inside the free tiers.
-
-**Done when:** a visitor uploads a PDF, asks a question, and gets a streamed, cited answer grounded in that document — at $0 cost.
 
 ### Slice 5 — Contact form + enquiry inbox
 
