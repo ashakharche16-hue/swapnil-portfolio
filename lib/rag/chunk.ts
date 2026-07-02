@@ -44,3 +44,25 @@ export function chunkText(
 
   return chunks;
 }
+
+export interface PageChunk {
+  content: string;
+  page: number;
+}
+
+/**
+ * Chunks an array of page texts, tagging each chunk with its 1-based page number
+ * for citations. Chunks do not span pages (keeps citations precise).
+ */
+export function chunkPages(
+  pages: string[],
+  opts?: { maxChars?: number; overlap?: number },
+): PageChunk[] {
+  const result: PageChunk[] = [];
+  pages.forEach((pageText, i) => {
+    for (const content of chunkText(pageText, opts)) {
+      result.push({ content, page: i + 1 });
+    }
+  });
+  return result;
+}

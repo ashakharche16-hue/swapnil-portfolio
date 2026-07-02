@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { extractFromFile } from "@/lib/rag/extract";
-import { chunkText } from "@/lib/rag/chunk";
+import { chunkPages } from "@/lib/rag/chunk";
 import { embed } from "@/lib/rag/embeddings";
+import { suggestQuestions } from "@/lib/rag/groq";
 import { toVector } from "@/lib/rag/store";
 
 export const runtime = "nodejs";
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // Best-effort cleanup of expired demo documents (cascades to chunks).
+  // Best-effort cleanup of expired demo documents (cascades to chunks/messages).
   await admin
     .from("rag_documents")
     .delete()
@@ -64,7 +65,8 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!extracted.text || extracted.text.length < 20) {
+  const fullText = extracted.pages.join("\n\n").trim();
+  if (fullText.length < 20) {
     return NextResponse.json(
       {
         error:
@@ -76,12 +78,17 @@ export async function POST(req: Request) {
     );
   }
 
-  let chunks = chunkText(extracted.text);
+  let chunks = chunkPages(extracted.pages);
   if (chunks.length > MAX_CHUNKS) chunks = chunks.slice(0, MAX_CHUNKS);
 
+  // Embeddings (local) and starter questions (Groq) in parallel.
   let vectors: number[][];
+  let suggestions: string[];
   try {
-    vectors = await embed(chunks);
+    [vectors, suggestions] = await Promise.all([
+      embed(chunks.map((c) => c.content)),
+      suggestQuestions(fullText),
+    ]);
   } catch {
     return NextResponse.json(
       { error: "Failed to index the document." },
@@ -91,7 +98,11 @@ export async function POST(req: Request) {
 
   const { data: doc, error: docError } = await admin
     .from("rag_documents")
-    .insert({ filename: file.name, page_count: extracted.pageCount })
+    .insert({
+      filename: file.name,
+      page_count: extracted.pageCount,
+      suggested: suggestions,
+    })
     .select("id")
     .single();
   if (docError || !doc) {
@@ -101,10 +112,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const rows = chunks.map((content, i) => ({
+  const rows = chunks.map((chunk, i) => ({
     document_id: doc.id,
     chunk_index: i,
-    content,
+    content: chunk.content,
+    page: chunk.page,
     embedding: toVector(vectors[i]),
   }));
   const { error: chunkError } = await admin.from("rag_chunks").insert(rows);
@@ -121,5 +133,6 @@ export async function POST(req: Request) {
     pageCount: extracted.pageCount,
     chunks: chunks.length,
     kind: extracted.kind,
+    suggestions,
   });
 }

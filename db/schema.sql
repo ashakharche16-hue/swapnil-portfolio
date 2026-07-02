@@ -99,21 +99,43 @@ create table if not exists rag_chunks (
   document_id uuid not null references rag_documents (id) on delete cascade,
   chunk_index int  not null,
   content     text not null,
+  page        int,
   embedding   vector(384),
   created_at  timestamptz not null default now()
 );
-create index if not exists rag_chunks_document_id_idx on rag_chunks (document_id);
-create index if not exists rag_chunks_embedding_idx
-  on rag_chunks using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+-- Migration-safe (existing installs):
+alter table rag_chunks add column if not exists page int;
 
--- Cosine similarity search within one document.
+create index if not exists rag_chunks_document_id_idx on rag_chunks (document_id);
+-- HNSW gives better recall/latency than ivfflat as data grows.
+drop index if exists rag_chunks_embedding_idx;
+create index if not exists rag_chunks_embedding_hnsw_idx
+  on rag_chunks using hnsw (embedding vector_cosine_ops);
+
+-- Multi-turn conversation memory (ephemeral — cascades when the doc expires).
+create table if not exists rag_messages (
+  id          uuid primary key default gen_random_uuid(),
+  document_id uuid not null references rag_documents (id) on delete cascade,
+  session_id  text not null,
+  role        text not null,          -- 'user' | 'assistant'
+  content     text not null,
+  sources     jsonb,
+  created_at  timestamptz not null default now()
+);
+create index if not exists rag_messages_lookup_idx
+  on rag_messages (document_id, session_id, created_at);
+
+-- Cosine similarity search within one document (returns page for citations).
+-- Drop first: the return type changed (added `page`), which CREATE OR REPLACE
+-- cannot do on an existing function.
+drop function if exists match_chunks (vector, uuid, int);
 create or replace function match_chunks (
   query_embedding   vector(384),
   match_document_id uuid,
   match_count       int default 5
-) returns table (id uuid, content text, chunk_index int, similarity float)
+) returns table (id uuid, content text, chunk_index int, page int, similarity float)
 language sql stable as $$
-  select c.id, c.content, c.chunk_index,
+  select c.id, c.content, c.chunk_index, c.page,
          1 - (c.embedding <=> query_embedding) as similarity
   from rag_chunks c
   where c.document_id = match_document_id
@@ -133,6 +155,7 @@ alter table contact_submissions enable row level security;
 alter table analytics_events    enable row level security;
 alter table rag_documents       enable row level security;
 alter table rag_chunks          enable row level security;
+alter table rag_messages        enable row level security;
 
 -- Public read of site content.
 drop policy if exists "public read profile" on profile;
@@ -159,6 +182,9 @@ create policy "public rw rag_documents" on rag_documents for all using (true) wi
 
 drop policy if exists "public rw rag_chunks" on rag_chunks;
 create policy "public rw rag_chunks" on rag_chunks for all using (true) with check (true);
+
+drop policy if exists "public rw rag_messages" on rag_messages;
+create policy "public rw rag_messages" on rag_messages for all using (true) with check (true);
 
 -- ============================================================================
 -- Storage — public `media` bucket for uploads (résumé PDF, images).
