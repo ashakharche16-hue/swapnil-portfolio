@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:seed": "tsx scripts/seed-db.ts"
+    "db:seed": "tsx scripts/seed-db.ts",
+    "db:patch-rag": "tsx scripts/patch-nav-ai.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
