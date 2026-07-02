@@ -87,9 +87,12 @@ create table if not exists rag_documents (
   filename   text not null,
   session_id text,
   page_count int,
+  suggested  jsonb,
   created_at timestamptz not null default now(),
   expires_at timestamptz not null default (now() + interval '24 hours')
 );
+-- Migration-safe (existing installs):
+alter table rag_documents add column if not exists suggested jsonb;
 
 create table if not exists rag_chunks (
   id          uuid primary key default gen_random_uuid(),
