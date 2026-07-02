@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/supabase-server";
+import { getAdminUser } from "@/lib/supabase-server";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 
@@ -13,7 +13,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   // Defense-in-depth: the middleware also gates /admin, but re-check here.
-  const user = await getCurrentUser();
+  const user = await getAdminUser();
   if (!user) redirect("/login");
 
   return (

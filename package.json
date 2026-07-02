@@ -4,14 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "lsof -ti tcp:3000 | xargs kill -9 2>/dev/null; next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:seed": "tsx scripts/seed-db.ts",
-    "db:patch-rag": "tsx scripts/patch-nav-ai.ts"
+    "db:seed": "tsx scripts/seed-db.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

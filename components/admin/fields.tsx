@@ -1,11 +1,47 @@
 "use client";
 
 import { useState } from "react";
+import type { IconName } from "@/types/content";
 
 export type SaveResult = { ok: true } | { ok: false; error: string };
 
 export const inputCls =
   "w-full rounded-lg border border-hairline bg-bg px-3 py-2 text-body outline-none focus:border-accent";
+
+export const ICON_OPTIONS: IconName[] = [
+  "mail",
+  "phone",
+  "linkedin",
+  "pin",
+  "calendar",
+  "building",
+  "check-circle",
+  "graduation-cap",
+  "download",
+  "arrow-up-right",
+];
+
+export function IconSelect({
+  value,
+  onChange,
+}: {
+  value: IconName;
+  onChange: (v: IconName) => void;
+}) {
+  return (
+    <select
+      className={inputCls}
+      value={value}
+      onChange={(e) => onChange(e.target.value as IconName)}
+    >
+      {ICON_OPTIONS.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 export function Field({
   label,

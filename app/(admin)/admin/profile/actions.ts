@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { seed } from "@/db/seed";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getCurrentUser } from "@/lib/supabase-server";
+import { getAdminUser } from "@/lib/supabase-server";
+import type { Chip, CTA, NavLink } from "@/types/content";
 
 export interface ProfileFormValues {
   // identity
@@ -21,6 +22,9 @@ export interface ProfileFormValues {
   rotatingRoles: string[];
   role: string;
   sub: string;
+  eyebrow: string[];
+  chips: Chip[];
+  ctas: CTA[];
 }
 
 export type SaveResult = { ok: true } | { ok: false; error: string };
@@ -28,9 +32,9 @@ export type SaveResult = { ok: true } | { ok: false; error: string };
 export async function saveProfile(
   values: ProfileFormValues,
 ): Promise<SaveResult> {
-  // Only an authenticated (owner) session may write.
-  const user = await getCurrentUser();
-  if (!user) return { ok: false, error: "Not authenticated." };
+  // Only an authenticated, allowlisted admin may write.
+  const user = await getAdminUser();
+  if (!user) return { ok: false, error: "Not authorized." };
 
   let admin;
   try {
@@ -39,8 +43,7 @@ export async function saveProfile(
     return { ok: false, error: (e as Error).message };
   }
 
-  // Load current row so we preserve fields the editor doesn't touch
-  // (hero.eyebrow/chips/ctas, footer, nav).
+  // Load current row so we preserve fields the editor doesn't touch (footer, nav).
   const { data: current } = await admin
     .from("profile")
     .select("identity, hero, footer, nav")
@@ -69,6 +72,9 @@ export async function saveProfile(
     rotatingRoles: values.rotatingRoles,
     role: values.role,
     sub: values.sub,
+    eyebrow: values.eyebrow,
+    chips: values.chips,
+    ctas: values.ctas,
   };
 
   const { error } = await admin.from("profile").upsert({
@@ -87,6 +93,33 @@ export async function saveProfile(
   return { ok: true };
 }
 
+export async function saveNav(nav: NavLink[]): Promise<SaveResult> {
+  const user = await getAdminUser();
+  if (!user) return { ok: false, error: "Not authorized." };
+
+  let admin;
+  try {
+    admin = getSupabaseAdmin();
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+
+  const cleaned = nav
+    .map((n) => ({ label: n.label.trim(), href: n.href.trim() }))
+    .filter((n) => n.label && n.href);
+
+  const { error } = await admin
+    .from("profile")
+    .update({ nav: cleaned, updated_at: new Date().toISOString() })
+    .eq("id", 1);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/");
+  revalidatePath("/admin/navigation");
+  return { ok: true };
+}
+
 export type UploadResult =
   { ok: true; url: string } | { ok: false; error: string };
 
@@ -96,8 +129,8 @@ export type UploadResult =
  * `media` (public) in Supabase Storage.
  */
 export async function uploadResume(formData: FormData): Promise<UploadResult> {
-  const user = await getCurrentUser();
-  if (!user) return { ok: false, error: "Not authenticated." };
+  const user = await getAdminUser();
+  if (!user) return { ok: false, error: "Not authorized." };
 
   const file = formData.get("file");
   if (!(file instanceof File)) return { ok: false, error: "No file provided." };

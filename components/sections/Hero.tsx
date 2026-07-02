@@ -52,17 +52,25 @@ export function Hero({ data }: { data: HeroContent }) {
       </div>
 
       <div className="cta-row">
-        {hero.ctas.map((cta) => (
-          <a
-            key={cta.label}
-            className={cta.primary ? "btn btn-primary" : "btn"}
-            href={cta.href}
-            {...(cta.download ? { download: true } : {})}
-          >
-            {cta.icon && <Icon name={cta.icon} />}
-            {cta.label}
-          </a>
-        ))}
+        {hero.ctas.map((cta) => {
+          const className =
+            cta.href === "/rag"
+              ? "btn btn-demo"
+              : cta.primary
+                ? "btn btn-primary"
+                : "btn";
+          return (
+            <a
+              key={cta.label}
+              className={className}
+              href={cta.href}
+              {...(cta.download ? { download: true } : {})}
+            >
+              {cta.icon && <Icon name={cta.icon} />}
+              {cta.label}
+            </a>
+          );
+        })}
       </div>
     </section>
   );

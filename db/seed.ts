@@ -28,7 +28,7 @@ export const seed: SiteContent = {
     { label: "experience", href: "#experience" },
     { label: "skills", href: "#skills" },
     { label: "ai", href: "#ai" },
-    { label: "rag demo", href: "/rag" },
+    { label: "live RAG demo", href: "/rag" },
     { label: "contact", href: "#contact" },
   ],
 
@@ -59,6 +59,7 @@ export const seed: SiteContent = {
         download: true,
         icon: "download",
       },
+      { label: "Try Live RAG Demo", href: "/rag", icon: "arrow-up-right" },
       { label: "View Selected Work", href: "#work" },
       { label: "Get in Touch", href: "#contact" },
     ],

@@ -21,50 +21,15 @@ import type {
 import { saveSection } from "@/app/(admin)/admin/sections/actions";
 import {
   Field,
+  IconSelect,
   Repeater,
   SaveBar,
   TagList,
   TextArea,
   TextInput,
-  inputCls,
 } from "@/components/admin/fields";
 
 const clean = (a: string[]) => a.map((s) => s.trim()).filter(Boolean);
-
-const ICON_OPTIONS: IconName[] = [
-  "mail",
-  "phone",
-  "linkedin",
-  "pin",
-  "calendar",
-  "building",
-  "check-circle",
-  "graduation-cap",
-  "download",
-  "arrow-up-right",
-];
-
-function IconSelect({
-  value,
-  onChange,
-}: {
-  value: IconName;
-  onChange: (v: IconName) => void;
-}) {
-  return (
-    <select
-      className={inputCls}
-      value={value}
-      onChange={(e) => onChange(e.target.value as IconName)}
-    >
-      {ICON_OPTIONS.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
-    </select>
-  );
-}
 
 function HeadingFields({
   heading,

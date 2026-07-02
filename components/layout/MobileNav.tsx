@@ -3,13 +3,20 @@
 import { useEffect, useState } from "react";
 import type { NavLink } from "@/types/content";
 import { Icon } from "@/components/icons";
+import { navHref } from "@/utils/nav";
 
 /**
  * Mobile-only navigation: a hamburger button that toggles a full-width
  * dropdown of the section links. Hidden on desktop via CSS (the inline
  * `nav.primary` is shown there instead).
  */
-export function MobileNav({ links }: { links: NavLink[] }) {
+export function MobileNav({
+  links,
+  anchorPrefix = "",
+}: {
+  links: NavLink[];
+  anchorPrefix?: string;
+}) {
   const [open, setOpen] = useState(false);
 
   // Close on Escape for keyboard users.
@@ -42,7 +49,12 @@ export function MobileNav({ links }: { links: NavLink[] }) {
           aria-label="Primary"
         >
           {links.map((link) => (
-            <a key={link.href} href={link.href} onClick={() => setOpen(false)}>
+            <a
+              key={link.href}
+              href={navHref(link.href, anchorPrefix)}
+              onClick={() => setOpen(false)}
+              className={link.href === "/rag" ? "nav-demo" : undefined}
+            >
               {link.label}
             </a>
           ))}

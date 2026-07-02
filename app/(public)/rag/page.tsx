@@ -17,7 +17,7 @@ export default async function RagPage() {
 
   return (
     <>
-      <TopBar identity={content.identity} nav={content.nav} />
+      <TopBar identity={content.identity} nav={content.nav} anchorPrefix="/" />
       <main className="wrap" style={{ padding: "72px 0 96px" }}>
         <RagDemo />
       </main>

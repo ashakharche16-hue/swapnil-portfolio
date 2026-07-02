@@ -1,35 +1,49 @@
 "use client";
 
 import { useState } from "react";
+import type { Chip, CTA, IconName } from "@/types/content";
 import type { ProfileRow } from "@/services/admin";
 import {
   saveProfile,
   uploadResume,
   type ProfileFormValues,
 } from "@/app/(admin)/admin/profile/actions";
+import {
+  Field,
+  IconSelect,
+  ICON_OPTIONS,
+  Repeater,
+  TagList,
+  TextArea,
+  TextInput,
+  inputCls,
+} from "@/components/admin/fields";
 
-function Field({
-  label,
-  hint,
-  children,
+const clean = (a: string[]) => a.map((s) => s.trim()).filter(Boolean);
+
+/** Icon select that also allows "no icon" (for CTAs). */
+function OptionalIcon({
+  value,
+  onChange,
 }: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
+  value?: IconName;
+  onChange: (v?: IconName) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="font-mono text-xs uppercase tracking-wider text-muted">
-        {label}
-      </span>
-      {children}
-      {hint && <span className="text-xs text-dim">{hint}</span>}
-    </label>
+    <select
+      className={inputCls}
+      value={value ?? ""}
+      onChange={(e) => onChange((e.target.value || undefined) as IconName)}
+    >
+      <option value="">(no icon)</option>
+      {ICON_OPTIONS.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
   );
 }
-
-const inputCls =
-  "rounded-lg border border-hairline bg-bg px-3 py-2 text-body outline-none focus:border-accent";
 
 export function ProfileEditor({ initial }: { initial: ProfileRow }) {
   const { identity, hero } = initial;
@@ -45,10 +59,15 @@ export function ProfileEditor({ initial }: { initial: ProfileRow }) {
     location: identity.location,
     resumeUrl: identity.resumeUrl,
     greeting: hero.name.map((s) => s.text).join(""),
-    rotatingRoles: hero.rotatingRoles.join("\n"),
     role: hero.role,
     sub: hero.sub,
   });
+  const [rotatingRoles, setRotatingRoles] = useState<string[]>(
+    hero.rotatingRoles ?? [],
+  );
+  const [eyebrow, setEyebrow] = useState<string[]>(hero.eyebrow ?? []);
+  const [chips, setChips] = useState<Chip[]>(hero.chips ?? []);
+  const [ctas, setCtas] = useState<CTA[]>(hero.ctas ?? []);
 
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
@@ -59,6 +78,11 @@ export function ProfileEditor({ initial }: { initial: ProfileRow }) {
     | { state: "error"; message: string }
     | { state: "done" }
   >({ state: "idle" });
+
+  function set<K extends keyof typeof values>(key: K, value: string) {
+    setValues((v) => ({ ...v, [key]: value }));
+    setStatus("idle");
+  }
 
   async function onResumeFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -73,11 +97,6 @@ export function ProfileEditor({ initial }: { initial: ProfileRow }) {
     } else {
       setUpload({ state: "error", message: result.error });
     }
-  }
-
-  function set<K extends keyof typeof values>(key: K, value: string) {
-    setValues((v) => ({ ...v, [key]: value }));
-    setStatus("idle");
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -98,10 +117,20 @@ export function ProfileEditor({ initial }: { initial: ProfileRow }) {
       greeting: values.greeting,
       role: values.role,
       sub: values.sub,
-      rotatingRoles: values.rotatingRoles
-        .split("\n")
-        .map((r) => r.trim())
-        .filter(Boolean),
+      rotatingRoles: clean(rotatingRoles),
+      eyebrow: clean(eyebrow),
+      chips: chips
+        .map((c) => ({ icon: c.icon, label: c.label.trim() }))
+        .filter((c) => c.label),
+      ctas: ctas
+        .map((c) => ({
+          label: c.label.trim(),
+          href: c.href.trim(),
+          ...(c.icon ? { icon: c.icon } : {}),
+          ...(c.primary ? { primary: true } : {}),
+          ...(c.download ? { download: true } : {}),
+        }))
+        .filter((c) => c.label && c.href),
     };
 
     const result = await saveProfile(payload);
@@ -115,10 +144,10 @@ export function ProfileEditor({ initial }: { initial: ProfileRow }) {
 
   return (
     <form onSubmit={onSubmit} className="max-w-2xl">
-      <h1 className="font-serif text-3xl text-body">Profile</h1>
+      <h1 className="font-serif text-3xl text-body">Profile &amp; hero</h1>
       <p className="mt-2 text-muted">
-        Hero headline and contact identity. Saving updates the live site
-        immediately.
+        Everything in the hero and your contact identity. Saving updates the
+        live site immediately.
       </p>
 
       <section className="mt-8">
@@ -127,43 +156,117 @@ export function ProfileEditor({ initial }: { initial: ProfileRow }) {
         </h2>
         <div className="flex flex-col gap-4">
           <Field label="Greeting (first line)">
-            <input
-              className={inputCls}
+            <TextInput
               value={values.greeting}
-              onChange={(e) => set("greeting", e.target.value)}
+              onChange={(v) => set("greeting", v)}
             />
           </Field>
           <Field
             label="Rotating roles"
             hint="One per line — the article (a/an) is added automatically."
           >
-            <textarea
+            <TagList
+              value={rotatingRoles}
+              onChange={setRotatingRoles}
               rows={5}
-              className={inputCls}
-              value={values.rotatingRoles}
-              onChange={(e) => set("rotatingRoles", e.target.value)}
             />
           </Field>
           <Field
             label="Role line"
             hint="Markers: **bold**, __accent__, `mono`."
           >
-            <textarea
-              rows={3}
-              className={inputCls}
-              value={values.role}
-              onChange={(e) => set("role", e.target.value)}
-            />
+            <TextArea value={values.role} onChange={(v) => set("role", v)} />
           </Field>
           <Field label="Sub line">
-            <textarea
-              rows={3}
-              className={inputCls}
-              value={values.sub}
-              onChange={(e) => set("sub", e.target.value)}
-            />
+            <TextArea value={values.sub} onChange={(v) => set("sub", v)} />
+          </Field>
+          <Field
+            label="Eyebrow tags"
+            hint="Small mono tags above the name. One per line."
+          >
+            <TagList value={eyebrow} onChange={setEyebrow} rows={3} />
           </Field>
         </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-4 font-mono text-xs uppercase tracking-wider text-accent">
+          Hero chips
+        </h2>
+        <Repeater
+          items={chips}
+          onChange={setChips}
+          create={(): Chip => ({ icon: "pin", label: "" })}
+          addLabel="Add chip"
+          title={(c) => c.label || "New chip"}
+          render={(c, update) => (
+            <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
+              <IconSelect
+                value={c.icon}
+                onChange={(v) => update({ icon: v })}
+              />
+              <TextInput
+                value={c.label}
+                onChange={(v) => update({ label: v })}
+              />
+            </div>
+          )}
+        />
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-4 font-mono text-xs uppercase tracking-wider text-accent">
+          Hero buttons (CTAs)
+        </h2>
+        <Repeater
+          items={ctas}
+          onChange={setCtas}
+          create={(): CTA => ({ label: "", href: "" })}
+          addLabel="Add button"
+          title={(c) => c.label || "New button"}
+          render={(c, update) => (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Label">
+                  <TextInput
+                    value={c.label}
+                    onChange={(v) => update({ label: v })}
+                  />
+                </Field>
+                <Field label="Link">
+                  <TextInput
+                    value={c.href}
+                    onChange={(v) => update({ href: v })}
+                  />
+                </Field>
+              </div>
+              <Field label="Icon">
+                <OptionalIcon
+                  value={c.icon}
+                  onChange={(v) => update({ icon: v })}
+                />
+              </Field>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 text-sm text-muted">
+                  <input
+                    type="checkbox"
+                    checked={!!c.primary}
+                    onChange={(e) => update({ primary: e.target.checked })}
+                  />
+                  Primary
+                </label>
+                <label className="flex items-center gap-2 text-sm text-muted">
+                  <input
+                    type="checkbox"
+                    checked={!!c.download}
+                    onChange={(e) => update({ download: e.target.checked })}
+                  />
+                  Download
+                </label>
+              </div>
+            </>
+          )}
+        />
       </section>
 
       <section className="mt-8">
@@ -172,70 +275,55 @@ export function ProfileEditor({ initial }: { initial: ProfileRow }) {
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Name">
-            <input
-              className={inputCls}
-              value={values.name}
-              onChange={(e) => set("name", e.target.value)}
-            />
+            <TextInput value={values.name} onChange={(v) => set("name", v)} />
           </Field>
           <Field label="Initials">
-            <input
-              className={inputCls}
+            <TextInput
               value={values.initials}
-              onChange={(e) => set("initials", e.target.value)}
+              onChange={(v) => set("initials", v)}
             />
           </Field>
           <Field label="Availability label">
-            <input
-              className={inputCls}
+            <TextInput
               value={values.availabilityLabel}
-              onChange={(e) => set("availabilityLabel", e.target.value)}
+              onChange={(v) => set("availabilityLabel", v)}
             />
           </Field>
           <Field label="Location">
-            <input
-              className={inputCls}
+            <TextInput
               value={values.location}
-              onChange={(e) => set("location", e.target.value)}
+              onChange={(v) => set("location", v)}
             />
           </Field>
           <Field label="Email">
-            <input
-              type="email"
-              className={inputCls}
+            <TextInput
               value={values.email}
-              onChange={(e) => set("email", e.target.value)}
+              onChange={(v) => set("email", v)}
+              type="email"
             />
           </Field>
           <Field label="Phone">
-            <input
-              className={inputCls}
-              value={values.phone}
-              onChange={(e) => set("phone", e.target.value)}
-            />
+            <TextInput value={values.phone} onChange={(v) => set("phone", v)} />
           </Field>
           <Field label="LinkedIn URL">
-            <input
-              className={inputCls}
+            <TextInput
               value={values.linkedinUrl}
-              onChange={(e) => set("linkedinUrl", e.target.value)}
+              onChange={(v) => set("linkedinUrl", v)}
             />
           </Field>
           <Field label="LinkedIn handle">
-            <input
-              className={inputCls}
+            <TextInput
               value={values.linkedinHandle}
-              onChange={(e) => set("linkedinHandle", e.target.value)}
+              onChange={(v) => set("linkedinHandle", v)}
             />
           </Field>
           <Field
             label="Résumé URL"
             hint="Paste a URL, or upload a PDF below to set it automatically."
           >
-            <input
-              className={inputCls}
+            <TextInput
               value={values.resumeUrl}
-              onChange={(e) => set("resumeUrl", e.target.value)}
+              onChange={(v) => set("resumeUrl", v)}
             />
           </Field>
           <Field label="Upload résumé (PDF → Storage)">
@@ -271,7 +359,9 @@ export function ProfileEditor({ initial }: { initial: ProfileRow }) {
           {status === "saving" ? "Saving…" : "Save changes"}
         </button>
         {status === "saved" && (
-          <span className="font-mono text-xs text-signal">✓ Saved</span>
+          <span className="font-mono text-xs text-signal">
+            ✓ Saved — live now
+          </span>
         )}
         {status === "error" && (
           <span role="alert" className="text-sm text-red-400">

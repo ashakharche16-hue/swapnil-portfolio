@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isAllowedAdmin } from "@/utils/admin";
 
 /**
  * Protects the /admin route group and keeps the auth session fresh.
@@ -34,17 +35,18 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+  const isAdmin = !!user && isAllowedAdmin(user.email);
 
-  // Gate the admin area.
-  if (pathname.startsWith("/admin") && !user) {
+  // Gate the admin area (must be signed in AND on the allowlist).
+  if (pathname.startsWith("/admin") && !isAdmin) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Already signed in? Skip the login page.
-  if (pathname === "/login" && user) {
+  // Already an admin? Skip the login page.
+  if (pathname === "/login" && isAdmin) {
     const adminUrl = request.nextUrl.clone();
     adminUrl.pathname = "/admin";
     adminUrl.search = "";

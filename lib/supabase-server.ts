@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { isAllowedAdmin } from "@/utils/admin";
 
 /**
  * Cookie-aware Supabase client for server components, server actions, and route
@@ -33,7 +34,7 @@ export function createServerSupabase(): SupabaseClient | null {
   });
 }
 
-/** The signed-in user, or null. Use to gate admin pages/actions. */
+/** The signed-in user, or null. */
 export async function getCurrentUser(): Promise<User | null> {
   const supabase = createServerSupabase();
   if (!supabase) return null;
@@ -41,4 +42,14 @@ export async function getCurrentUser(): Promise<User | null> {
     data: { user },
   } = await supabase.auth.getUser();
   return user ?? null;
+}
+
+/**
+ * The signed-in user IF they're on the admin allowlist, else null.
+ * Use this to gate admin pages and server actions.
+ */
+export async function getAdminUser(): Promise<User | null> {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  return isAllowedAdmin(user.email) ? user : null;
 }

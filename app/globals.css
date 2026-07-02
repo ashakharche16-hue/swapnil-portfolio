@@ -237,6 +237,25 @@
     background: var(--bg-soft);
   }
 
+  /* Highlighted "Live RAG demo" nav link — stands out as a live, self-built demo. */
+  .nav-demo {
+    color: var(--accent) !important;
+  }
+  .nav-demo::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--signal);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 20%, transparent);
+    vertical-align: middle;
+  }
+  nav.primary a.nav-demo:hover {
+    background: var(--accent-soft);
+  }
+
   .topbar-actions {
     display: flex;
     align-items: center;
@@ -403,6 +422,25 @@
   .btn-primary:hover {
     background: color-mix(in srgb, var(--text) 88%, transparent);
     border-color: var(--text);
+  }
+  /* Live AI demo CTA — accent-outlined with a green "live" dot. */
+  .btn-demo {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .btn-demo:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+  .btn-demo::before {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--signal);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 20%, transparent);
   }
 
   /* ---- Section scaffolding ---- */

@@ -2,15 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getCurrentUser } from "@/lib/supabase-server";
+import { getAdminUser } from "@/lib/supabase-server";
 import type { SectionHeading, SectionKey } from "@/types/content";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type Result = { ok: true } | { ok: false; error: string };
 
 async function authedAdmin(): Promise<SupabaseClient> {
-  const user = await getCurrentUser();
-  if (!user) throw new Error("Not authenticated.");
+  const user = await getAdminUser();
+  if (!user) throw new Error("Not authorized.");
   return getSupabaseAdmin();
 }
 
