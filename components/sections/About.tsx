@@ -1,30 +1,29 @@
 import type { AboutContent } from "@/types/content";
-import { Reveal } from "@/components/ui/Reveal";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { RichText } from "@/components/ui/RichText";
 
 export function About({ data }: { data: AboutContent }) {
   const about = data;
+  // The first paragraph is the teaser (shown in the summary). The body renders
+  // the rest, so nothing is duplicated when the section is expanded.
+  const [, ...rest] = about.paragraphs;
 
   return (
-    <section className="block" id="about">
-      <div className="wrap">
-        <Reveal className="section-head">
-          <div className="label">
-            <h2 className="eyebrow">
-              <span className="num">{about.heading.num}</span>
-              {about.heading.title}
-            </h2>
-            <span className="meta">{about.heading.meta}</span>
-          </div>
-          <div className="lead">
-            {about.paragraphs.map((paragraph, i) => (
-              <p key={i} className={i > 0 ? "mt-5" : undefined}>
-                <RichText text={paragraph} />
-              </p>
-            ))}
-          </div>
-        </Reveal>
-      </div>
-    </section>
+    <CollapsibleSection
+      id="about"
+      heading={about.heading}
+      teaser={about.paragraphs[0]}
+      defaultOpen
+    >
+      {rest.length > 0 && (
+        <div className="about-body">
+          {rest.map((paragraph, i) => (
+            <p key={i} className={i > 0 ? "mt-5" : undefined}>
+              <RichText text={paragraph} />
+            </p>
+          ))}
+        </div>
+      )}
+    </CollapsibleSection>
   );
 }

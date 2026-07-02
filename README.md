@@ -17,6 +17,7 @@ See [`CLAUDE.md`](./CLAUDE.md) for the full product brief and slice-by-slice pla
 - [Environment variables](#environment-variables)
 - [Supabase setup (one time)](#supabase-setup-one-time)
 - [Using the admin dashboard](#using-the-admin-dashboard)
+- [Contact form & email (Resend)](#contact-form--email-resend)
 - [The RAG demo (`/rag`)](#the-rag-demo-rag)
 - [Security](#security)
 - [Deploying to Vercel](#deploying-to-vercel)
@@ -31,6 +32,11 @@ See [`CLAUDE.md`](./CLAUDE.md) for the full product brief and slice-by-slice pla
   and show/hide sections; résumé PDF upload to storage.
 - **Live RAG demo** at `/rag`: PDF/image upload → local OCR + embeddings →
   pgvector retrieval + reranking → streamed, cited answers with follow-up memory.
+- **Compact, expandable sections** — content sections collapse to a title +
+  short teaser (native `<details>`, keyboard-accessible) so recruiters scan the
+  whole page at a glance and expand what interests them.
+- **Spam-safe contact form** — no exposed email/phone; submissions are stored in
+  Supabase and emailed to you (Resend), with honeypot + rate-limit + quota caps.
 - Content is served from Supabase, with an automatic fallback to a local seed so
   the site always renders (even with no keys configured).
 
@@ -41,6 +47,7 @@ See [`CLAUDE.md`](./CLAUDE.md) for the full product brief and slice-by-slice pla
 - **Supabase** — Postgres (+ `pgvector`), Auth, Storage
 - **RAG demo**: `unpdf` (PDF text), `tesseract.js` (image OCR),
   `@huggingface/transformers` (local embeddings + reranker), **Groq** (answers)
+- **Contact email**: **Resend**
 - **Vercel** hosting
 
 ## Project structure
@@ -82,18 +89,26 @@ enable the database, admin, and RAG demo, set up Supabase (below).
 Copy `.env.example` → `.env.local` and fill in values. **Never commit
 `.env.local`** (it's gitignored).
 
-| Variable                        | Public? | Used for                                                                            |
-| ------------------------------- | ------- | ----------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | yes     | Supabase project URL                                                                |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes     | Public reads + auth (respects RLS)                                                  |
-| `SUPABASE_SERVICE_ROLE_KEY`     | **no**  | Server-only writes (seed, admin actions, storage)                                   |
-| `NEXT_PUBLIC_SITE_URL`          | yes     | Canonical URL (SEO)                                                                 |
-| `ADMIN_EMAILS`                  | **no**  | Comma-separated admin allowlist (see [Security](#security))                         |
-| `GROQ_API_KEY`                  | **no**  | RAG demo answer generation ([console.groq.com/keys](https://console.groq.com/keys)) |
+| Variable                        | Public? | Used for                                                                                     |
+| ------------------------------- | ------- | -------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | yes     | Supabase project URL                                                                         |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes     | Public reads + auth (respects RLS)                                                           |
+| `SUPABASE_SERVICE_ROLE_KEY`     | **no**  | Server-only writes (seed, admin actions, storage)                                            |
+| `NEXT_PUBLIC_SITE_URL`          | yes     | Canonical URL (SEO)                                                                          |
+| `ADMIN_EMAILS`                  | **no**  | Comma-separated admin allowlist (see [Security](#security))                                  |
+| `GROQ_API_KEY`                  | **no**  | RAG demo answer generation ([console.groq.com/keys](https://console.groq.com/keys))          |
+| `RESEND_API_KEY`                | **no**  | Contact-form email ([resend.com](https://resend.com)); if unset, submissions are stored only |
+| `CONTACT_TO_EMAIL`              | **no**  | Where inquiries are emailed (defaults to the seed identity email)                            |
+| `RESEND_FROM`                   | **no**  | From address (default `Portfolio <onboarding@resend.dev>`)                                   |
+| `CONTACT_MONTHLY_EMAIL_CAP`     | **no**  | Skip emailing past N/month (default `2900`; message still stored)                            |
+| `CONTACT_DAILY_EMAIL_CAP`       | **no**  | Skip emailing past N/day (default `90`)                                                      |
+| `CONTACT_MAX_PER_IP_HOUR`       | **no**  | Reject (429) past N submissions/hour per IP (default `3`)                                    |
+| `CONTACT_MAX_PER_IP_DAY`        | **no**  | Reject (429) past N submissions/day per IP (default `10`)                                    |
 
-> `NEXT_PUBLIC_*` are inlined into the client bundle at build time; the
-> service-role key and `GROQ_API_KEY` are **server-only** and never shipped to
-> the browser. **Next reads env only at startup** — restart the dev server
+> `NEXT_PUBLIC_*` are inlined into the client bundle at build time; every other
+> variable (service-role key, `GROQ_API_KEY`, `RESEND_API_KEY`, `ADMIN_EMAILS`,
+> the contact caps) is **server-only** and never shipped to the browser.
+> **Next reads env only at startup** — restart the dev server
 > (`npm run dev:clean`) after changing `.env.local`.
 
 ## Supabase setup (one time)
@@ -102,6 +117,8 @@ Copy `.env.example` → `.env.local` and fill in values. **Never commit
 2. In the **SQL Editor**, run [`db/schema.sql`](./db/schema.sql). It's
    idempotent (safe to re-run) and creates all tables, RLS policies, the
    `pgvector` bits for the RAG demo, and a public `media` storage bucket.
+   **Re-run it whenever you pull schema changes** (it uses `add column if not
+exists` / `create … if not exists`, so re-running is safe and additive).
 3. **Project Settings → API** → copy the Project URL, `anon` key, and
    `service_role` key into `.env.local`.
 4. Seed the content: `npm run db:seed`.
@@ -130,6 +147,49 @@ All saves write to Supabase and appear on the site after a refresh.
 
 Inline text markers supported in many fields: `**bold**`, `__accent__`,
 `` `mono` ``.
+
+The public content sections (About, Experience, Selected Work, AI, Capabilities,
+Recognition) render as **collapsible panels** — each shows a title + a two-line
+teaser and expands on click (About is open by default). Hero, metrics, and
+contact stay always-visible.
+
+## Contact form & email (Resend)
+
+The contact section shows a form (name / email / message) instead of exposing a
+phone or email address. On submit, `POST /api/contact`:
+
+1. **Stores** the message in the `contact_submissions` table (works with just
+   Supabase configured — read it in the Table editor until the admin inbox
+   lands).
+2. **Emails you** via [Resend](https://resend.com) — but only when
+   `RESEND_API_KEY` is set.
+
+**Setup**
+
+1. Create a free account at [resend.com](https://resend.com) and copy an API key.
+2. Set `RESEND_API_KEY` in `.env.local` (and Vercel). Optionally set
+   `CONTACT_TO_EMAIL` (defaults to the seed identity email) and `RESEND_FROM`.
+3. Re-run `db/schema.sql` so the `ip` column + rate-limit indexes exist.
+4. `npm run dev:clean`, then test the form at `/#contact`.
+
+> Resend's test sender (`onboarding@resend.dev`) delivers to **your own** account
+> email — fine for personal use. To send from a custom domain (or to arbitrary
+> recipients), verify a domain in Resend and set `RESEND_FROM` accordingly.
+
+**Abuse & free-tier guards** (Resend free tier = 3,000/mo, 100/day). All are
+env-tunable (see the [table](#environment-variables)); message storage is never
+blocked, only the email:
+
+- **Honeypot** — a hidden `company` field; bot-filled submissions are silently
+  dropped (no store, no email).
+- **Per-IP rate limit** — `CONTACT_MAX_PER_IP_HOUR` (3) and
+  `CONTACT_MAX_PER_IP_DAY` (10) → HTTP 429.
+- **Send caps** — past `CONTACT_DAILY_EMAIL_CAP` (90) or
+  `CONTACT_MONTHLY_EMAIL_CAP` (2900), the message is **stored but not emailed**,
+  so you can never exceed the free tier.
+
+> Per-IP limits rely on `x-forwarded-for`, which Vercel sets automatically. In
+> local dev every request looks like one IP — expected.
 
 ## The RAG demo (`/rag`)
 
@@ -178,8 +238,8 @@ is not pushed. Vercel keeps its own copy of the env vars.
 3. **Settings → Environment Variables** — add the variables from the
    [table above](#environment-variables) (same values as `.env.local`), scoped
    to **Production** (and **Preview** if you want preview deploys to work). Keep
-   `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, and `ADMIN_EMAILS` **secret**
-   (do not prefix with `NEXT_PUBLIC`).
+   `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, `RESEND_API_KEY`, and
+   `ADMIN_EMAILS` **secret** (do not prefix with `NEXT_PUBLIC`).
 4. **Deploy.** Env vars only apply to builds created after they're added — if you
    add them later, trigger a redeploy.
 5. In Supabase → **Authentication → URL Configuration**, set **Site URL** to
@@ -214,5 +274,10 @@ with `vercel env pull .env.local`.
   storage bucket).
 - **RAG says "not configured" (503).** `GROQ_API_KEY` isn't set — add it and
   `npm run dev:clean`.
+- **Contact form saves but no email arrives.** Set `RESEND_API_KEY` (+
+  `npm run dev:clean`); check spam; confirm you haven't hit a send cap. Messages
+  are always stored in `contact_submissions` regardless.
+- **Contact form errors on submit / IP limits.** Re-run `db/schema.sql` so the
+  `ip` column and rate-limit indexes exist.
 - **Can't log into `/admin`.** Confirm the user exists in Supabase Auth and, if
   `ADMIN_EMAILS` is set, that your login email is in the list.

@@ -215,7 +215,7 @@ export function RagDemo() {
       <h1 className="mt-3 font-serif text-4xl text-body">Ask my documents</h1>
       <p className="mt-3 text-muted">
         Upload a PDF (or an image to OCR) and ask questions answered only from
-        its contents — with citations and follow-up memory. Parsing, embeddings,
+        its contents, with citations and follow-up memory. Parsing, embeddings,
         and reranking run locally at no cost; answers stream from a fast open
         model.
       </p>

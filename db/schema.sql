@@ -48,9 +48,16 @@ create table if not exists contact_submissions (
   name       text not null,
   email      text not null,
   message    text not null,
+  ip         text,
   handled    boolean not null default false,
   created_at timestamptz not null default now()
 );
+-- Migration-safe (existing installs) + index for rate-limit/cap counts:
+alter table contact_submissions add column if not exists ip text;
+create index if not exists contact_submissions_created_at_idx
+  on contact_submissions (created_at);
+create index if not exists contact_submissions_ip_idx
+  on contact_submissions (ip, created_at);
 
 -- ---------------------------------------------------------------------------
 -- blog_posts — markdown blog (Slice 6).
