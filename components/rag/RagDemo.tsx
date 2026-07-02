@@ -93,21 +93,39 @@ export function RagDemo() {
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/rag/ingest", { method: "POST", body: fd });
-      const data = await res.json();
+      const raw = await res.text();
+      let data: {
+        error?: string;
+        documentId?: string;
+        filename?: string;
+        chunks?: number;
+        pageCount?: number;
+        suggestions?: string[];
+      } = {};
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        // non-JSON response (e.g. an error page)
+      }
       if (!res.ok) {
-        setUploadError(data.error ?? "Upload failed.");
+        setUploadError(
+          data.error ??
+            `Upload failed (HTTP ${res.status}). ${raw.slice(0, 140)}`,
+        );
       } else {
         setDoc({
-          documentId: data.documentId,
-          filename: data.filename,
-          chunks: data.chunks,
-          pageCount: data.pageCount,
+          documentId: data.documentId!,
+          filename: data.filename!,
+          chunks: data.chunks!,
+          pageCount: data.pageCount!,
           suggestions: data.suggestions ?? [],
         });
         setMessages([]);
       }
-    } catch {
-      setUploadError("Upload failed. Please try again.");
+    } catch (err) {
+      setUploadError(
+        `Upload failed: ${err instanceof Error ? err.message : "network error"}. Please try again.`,
+      );
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
