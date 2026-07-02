@@ -89,9 +89,13 @@ export async function POST(req: Request) {
       embed(chunks.map((c) => c.content)),
       suggestQuestions(fullText),
     ]);
-  } catch {
+  } catch (err) {
+    console.error("[rag] index (embed) failed:", err);
     return NextResponse.json(
-      { error: "Failed to index the document." },
+      {
+        error:
+          "Failed to index the document. If this is the first upload, the local AI model may still be downloading — please try again in a moment.",
+      },
       { status: 500 },
     );
   }

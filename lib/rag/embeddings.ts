@@ -17,6 +17,12 @@ async function getPipeline(): Promise<FeatureExtractionPipeline> {
         env.cacheDir = process.env.TRANSFORMERS_CACHE;
       return pipeline("feature-extraction", "Xenova/bge-small-en-v1.5");
     })();
+    // If loading fails (e.g. an interrupted first-time model download), clear
+    // the cached promise so the NEXT call retries instead of failing forever.
+    pipelinePromise.catch((err) => {
+      console.error("[rag] embedding model failed to load:", err);
+      pipelinePromise = null;
+    });
   }
   return pipelinePromise;
 }
