@@ -142,6 +142,8 @@ export interface AIPattern {
   title: string;
   description: string;
   stack: string[];
+  /** Optional link — when set, the card becomes clickable (e.g. the live RAG demo). */
+  href?: string;
 }
 
 export interface AIContent {

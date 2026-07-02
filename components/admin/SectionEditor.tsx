@@ -325,6 +325,15 @@ function AIEditor({
                   onChange={(v) => update({ stack: v })}
                 />
               </Field>
+              <Field
+                label="Link (optional)"
+                hint="Makes the card clickable — e.g. /rag for the live demo."
+              >
+                <TextInput
+                  value={p.href ?? ""}
+                  onChange={(v) => update({ href: v })}
+                />
+              </Field>
             </>
           )}
         />
@@ -332,7 +341,11 @@ function AIEditor({
       <SaveBar
         onSave={() =>
           saveSection("ai", heading, {
-            patterns: patterns.map((p) => ({ ...p, stack: clean(p.stack) })),
+            patterns: patterns.map((p) => ({
+              ...p,
+              stack: clean(p.stack),
+              href: p.href?.trim() || undefined,
+            })),
           })
         }
       />

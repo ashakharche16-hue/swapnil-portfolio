@@ -28,6 +28,7 @@ export const seed: SiteContent = {
     { label: "experience", href: "#experience" },
     { label: "skills", href: "#skills" },
     { label: "ai", href: "#ai" },
+    { label: "rag demo", href: "/rag" },
     { label: "contact", href: "#contact" },
   ],
 
@@ -248,21 +249,22 @@ export const seed: SiteContent = {
     },
     patterns: [
       {
-        num: "PATTERN 01",
-        title: "Retrieval-Augmented Generation over enterprise documentation.",
+        num: "PROJECT 01",
+        title: "Live RAG demo — ask questions of any PDF, on this site.",
         description:
-          "Semantic retrieval layered over OCR'd PDFs so engineers can ask plain-language questions of dense reference material. The win is composability: same pattern, different corpus.",
-        stack: ["RAG", "ChromaDB", "Flask", "OCR"],
+          "A working Retrieval-Augmented Generation app right here: upload a PDF and get answers grounded in its contents, with citations and follow-up memory. Local parsing, embeddings, and reranking; streamed answers. Click to try it.",
+        stack: ["Next.js", "pgvector", "Transformers.js", "Groq", "OCR"],
+        href: "/rag",
       },
       {
-        num: "PATTERN 02",
+        num: "PROJECT 02",
         title: "Human-in-the-loop classification at production scale.",
         description:
           "LLM-based triage with a confidence threshold and a human reviewer for the long tail. Designed for the 91%-accurate case to land automatically and the 9% to land safely.",
         stack: ["OpenAI", "Lambda", "n8n", "Python"],
       },
       {
-        num: "PATTERN 03",
+        num: "PROJECT 03",
         title: "AI-driven artifact generation in delivery workflows.",
         description:
           "Pipelines that auto-generate Excel storyboards from Figma and legacy UI metadata — eliminating 6–12 hours of manual documentation per screen and delivering 40–70× gains.",

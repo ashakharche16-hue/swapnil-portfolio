@@ -224,6 +224,22 @@ export function RagDemo() {
         material.
       </p>
 
+      {/* How to use */}
+      <ol className="mt-6 flex flex-col gap-1.5 text-sm text-muted">
+        <li>
+          <span className="mr-2 font-mono text-xs text-accent">1</span>
+          Upload a text-based PDF (or an image to OCR).
+        </li>
+        <li>
+          <span className="mr-2 font-mono text-xs text-accent">2</span>
+          Ask a question — or tap a suggested one.
+        </li>
+        <li>
+          <span className="mr-2 font-mono text-xs text-accent">3</span>
+          Read the cited answer, then ask follow-ups — it remembers the thread.
+        </li>
+      </ol>
+
       {/* Upload / document status */}
       {!doc ? (
         <div className="mt-8 rounded-2xl border border-hairline bg-elev p-5">
