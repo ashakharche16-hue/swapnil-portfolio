@@ -3,12 +3,23 @@ import { embedOne } from "@/lib/rag/embeddings";
 import { rerank } from "@/lib/rag/rerank";
 import { toVector } from "@/lib/rag/store";
 import { getGroq, condenseQuestion, ANSWER_MODEL } from "@/lib/rag/groq";
+import {
+  checkQuestionRate,
+  checkTokenBudget,
+  logAsk,
+  ragConfig,
+} from "@/lib/rag/usage";
+import {
+  getCachedAnswer,
+  putCachedAnswer,
+  normalizeQuestion,
+} from "@/lib/rag/cache";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const RETRIEVE = 20; // wide net for the reranker
-const KEEP = 5; // final context size
+const HISTORY_CHARS = 300; // max chars kept per prior message
 
 interface Match {
   content: string;
@@ -56,15 +67,69 @@ export async function POST(req: Request) {
     });
   }
 
-  // Prior turns for this document + session (history-aware retrieval).
+  // Per-IP rate limit (applies to every question, incl. cache hits).
+  const fwd = req.headers.get("x-forwarded-for");
+  const ip = fwd?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "";
+  const rate = await checkQuestionRate(admin, ip);
+  if (!rate.ok) return new Response(rate.message, { status: rate.status });
+
+  // Prior turns for this document + session (history-aware retrieval),
+  // trimmed to the most recent N messages to bound input tokens.
   const { data: history } = await admin
     .from("rag_messages")
     .select("role, content")
     .eq("document_id", documentId)
     .eq("session_id", sessionId)
-    .order("created_at")
-    .limit(8);
-  const priorTurns = (history ?? []) as { role: string; content: string }[];
+    .order("created_at", { ascending: false })
+    .limit(ragConfig.historyMessages());
+  const priorTurns = ((history ?? []) as { role: string; content: string }[])
+    .reverse()
+    .map((m) => ({ role: m.role, content: m.content.slice(0, HISTORY_CHARS) }));
+
+  // Answer cache — only for first-turn questions (no history), where the answer
+  // doesn't depend on conversation context. Hits cost zero Groq tokens.
+  const isFirstTurn = priorTurns.length === 0;
+  const questionNorm = normalizeQuestion(question);
+  if (isFirstTurn) {
+    const cached = await getCachedAnswer(admin, documentId, questionNorm);
+    if (cached) {
+      // Persist the turn so follow-ups still have context (best-effort).
+      try {
+        await admin.from("rag_messages").insert([
+          {
+            document_id: documentId,
+            session_id: sessionId,
+            role: "user",
+            content: question.trim(),
+          },
+          {
+            document_id: documentId,
+            session_id: sessionId,
+            role: "assistant",
+            content: cached.answer,
+            sources: cached.sources,
+          },
+        ]);
+      } catch {
+        // non-fatal
+      }
+      return new Response(cached.answer, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Rag-Cache": "hit",
+          "X-Rag-Sources": Buffer.from(JSON.stringify(cached.sources)).toString(
+            "base64",
+          ),
+        },
+      });
+    }
+  }
+
+  // Cache miss (or a follow-up): now we may spend tokens — check the budget.
+  const budget = await checkTokenBudget(admin);
+  if (!budget.ok)
+    return new Response(budget.message, { status: budget.status });
 
   const searchQuery = await condenseQuestion(priorTurns, question);
 
@@ -84,15 +149,20 @@ export async function POST(req: Request) {
     );
   }
 
-  const top = await rerank(searchQuery, retrieved, KEEP);
+  const top = await rerank(searchQuery, retrieved, ragConfig.keepChunks());
 
   const sources: Source[] = top.map((m, i) => ({
     n: i + 1,
     page: m.page,
     snippet: m.content.replace(/\s+/g, " ").slice(0, 180).trim(),
   }));
+  // Truncate each chunk to bound input tokens sent to the model.
+  const chunkChars = ragConfig.chunkChars();
   const context = top
-    .map((m, i) => `[${i + 1}]${m.page ? ` (p.${m.page})` : ""} ${m.content}`)
+    .map(
+      (m, i) =>
+        `[${i + 1}]${m.page ? ` (p.${m.page})` : ""} ${m.content.slice(0, chunkChars)}`,
+    )
     .join("\n\n");
 
   const historyText = priorTurns
@@ -123,6 +193,7 @@ export async function POST(req: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let answer = "";
+      let tokens = 0;
       try {
         for await (const chunk of completion) {
           const token = chunk.choices[0]?.delta?.content ?? "";
@@ -130,6 +201,12 @@ export async function POST(req: Request) {
             answer += token;
             controller.enqueue(encoder.encode(token));
           }
+          // Usage arrives on the final chunk (Groq: x_groq.usage).
+          const usage =
+            (chunk as { usage?: { total_tokens?: number } }).usage ??
+            (chunk as { x_groq?: { usage?: { total_tokens?: number } } }).x_groq
+              ?.usage;
+          if (usage?.total_tokens) tokens = usage.total_tokens;
         }
       } catch {
         controller.enqueue(
@@ -137,6 +214,30 @@ export async function POST(req: Request) {
         );
       } finally {
         controller.close();
+      }
+      // Record token usage for the daily budget + monitoring (best-effort).
+      await logAsk(admin, {
+        ip,
+        sessionId,
+        documentId,
+        tokens,
+        model: ANSWER_MODEL,
+      });
+      // Cache first-turn answers so identical questions cost zero tokens next
+      // time. Skip empties and the error placeholder.
+      if (
+        isFirstTurn &&
+        answer.trim() &&
+        !answer.includes("[Error generating")
+      ) {
+        await putCachedAnswer(
+          admin,
+          documentId,
+          questionNorm,
+          question.trim(),
+          answer,
+          sources,
+        );
       }
       // Persist the turn (best-effort) for multi-turn memory.
       try {

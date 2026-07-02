@@ -8,6 +8,7 @@ const NAV = [
   { label: "Profile & hero", href: "/admin/profile" },
   { label: "Navigation", href: "/admin/navigation" },
   { label: "Sections", href: "/admin/sections" },
+  { label: "Inbox", href: "/admin/inbox" },
 ];
 
 const SECTIONS = [

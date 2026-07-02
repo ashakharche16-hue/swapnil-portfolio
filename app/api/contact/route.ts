@@ -102,9 +102,22 @@ export async function POST(req: Request) {
   let stored = false;
   if (admin) {
     try {
-      const { error } = await admin
-        .from("contact_submissions")
-        .insert({ name: n, email: e, message: m, ip: ip || null });
+      const row: Record<string, unknown> = {
+        name: n,
+        email: e,
+        message: m,
+        ip: ip || null,
+      };
+      let { error } = await admin.from("contact_submissions").insert(row);
+      // If the `ip` column hasn't been migrated yet, store without it rather
+      // than lose the message. (Run db/schema.sql to enable IP + rate limits.)
+      if (error?.code === "PGRST204") {
+        console.warn(
+          "[contact] 'ip' column missing — run db/schema.sql. Storing without it.",
+        );
+        delete row.ip;
+        ({ error } = await admin.from("contact_submissions").insert(row));
+      }
       if (error) console.error("[contact] store failed:", error);
       else stored = true;
     } catch (err) {

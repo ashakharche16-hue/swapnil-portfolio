@@ -7,13 +7,33 @@ export function ContactForm() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [company, setCompany] = useState(""); // honeypot — real users leave empty
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
     "idle",
   );
   const [error, setError] = useState<string | null>(null);
 
+  // Returns an error message for the current email, or null if it looks valid.
+  function validateEmail(value: string): string | null {
+    const v = value.trim();
+    if (!v) return null; // don't nag before they've typed anything
+    if (!v.includes("@")) return "Please include an '@' in the email address.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
+      return "Please enter a valid email address.";
+    return null;
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    // Basic client-side email validation (server validates too).
+    const emailMsg =
+      validateEmail(email) ?? (!email.trim() ? "Email is required." : null);
+    if (emailMsg) {
+      setEmailError(emailMsg);
+      return;
+    }
+
     setStatus("sending");
     setError(null);
     try {
@@ -100,8 +120,18 @@ export function ContactForm() {
           value={email}
           maxLength={200}
           required
-          onChange={(ev) => setEmail(ev.target.value)}
+          aria-invalid={emailError ? true : undefined}
+          onChange={(ev) => {
+            setEmail(ev.target.value);
+            if (emailError) setEmailError(null); // clear while correcting
+          }}
+          onBlur={() => setEmailError(validateEmail(email))}
         />
+        {emailError && (
+          <span role="alert" className="text-sm text-red-400">
+            {emailError}
+          </span>
+        )}
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="font-mono text-xs uppercase tracking-wider text-muted">

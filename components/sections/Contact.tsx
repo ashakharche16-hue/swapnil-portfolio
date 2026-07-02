@@ -53,7 +53,7 @@ export function Contact({
               </a>
               <a className="btn" href={identity.resumeUrl} download>
                 <Icon name="download" />
-                Résumé
+                Resume
               </a>
             </div>
           </div>

@@ -13,6 +13,7 @@ import { Capabilities } from "@/components/sections/Capabilities";
 import { Recognition } from "@/components/sections/Recognition";
 import { Contact } from "@/components/sections/Contact";
 import { BackToTop } from "@/components/ui/BackToTop";
+import { SectionNav } from "@/components/ui/SectionNav";
 
 // Render per request so edits in Supabase appear on the live site immediately.
 // (Perf/ISR tuning happens in Slice 8.)
@@ -46,6 +47,7 @@ export default async function Home() {
       </main>
       <Footer data={content.footer} />
       <BackToTop />
+      <SectionNav />
     </>
   );
 }

@@ -6,7 +6,9 @@ editable from a protected `/admin` dashboard — no code changes needed. It also
 ships a **live, zero-cost RAG demo** (`/rag`) where visitors upload a PDF and ask
 questions answered from its contents.
 
-See [`CLAUDE.md`](./CLAUDE.md) for the full product brief and slice-by-slice plan.
+See [`CLAUDE.md`](./CLAUDE.md) for the full product brief and slice-by-slice
+plan, and [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the system design and the
+rationale behind each component.
 
 ## Contents
 
@@ -104,6 +106,12 @@ Copy `.env.example` → `.env.local` and fill in values. **Never commit
 | `CONTACT_DAILY_EMAIL_CAP`       | **no**  | Skip emailing past N/day (default `90`)                                                      |
 | `CONTACT_MAX_PER_IP_HOUR`       | **no**  | Reject (429) past N submissions/hour per IP (default `3`)                                    |
 | `CONTACT_MAX_PER_IP_DAY`        | **no**  | Reject (429) past N submissions/day per IP (default `10`)                                    |
+| `RAG_KEEP_CHUNKS`               | **no**  | Context chunks sent to the model (default `4`)                                               |
+| `RAG_CHUNK_CHARS`               | **no**  | Max chars per chunk in the prompt (default `800`)                                            |
+| `RAG_HISTORY_MESSAGES`          | **no**  | Prior chat messages kept for context (default `6`)                                           |
+| `RAG_MAX_QUESTIONS_PER_MIN`     | **no**  | Per-IP question rate limit / minute (default `8`)                                            |
+| `RAG_MAX_QUESTIONS_PER_DAY`     | **no**  | Per-IP question rate limit / day (default `100`)                                             |
+| `RAG_DAILY_TOKEN_BUDGET`        | **no**  | Global daily Groq token budget; answers pause once exceeded (default `300000`)               |
 
 > `NEXT_PUBLIC_*` are inlined into the client bundle at build time; every other
 > variable (service-role key, `GROQ_API_KEY`, `RESEND_API_KEY`, `ADMIN_EMAILS`,
@@ -142,6 +150,9 @@ Sign in at **`/login`** → you land on **`/admin`**. Sidebar sections:
 - **Sections** — reorder and show/hide body sections, and edit each one
   (Metrics, About, Experience, Selected Work, AI, Capabilities, Recognition,
   Contact) with full add/remove/reorder of nested items.
+- **Inbox** — read contact-form submissions; filter New/All, Reply (mailto),
+  Mark handled / Mark as new, and Delete. Works with just Supabase configured
+  (email is optional).
 
 All saves write to Supabase and appear on the site after a refresh.
 
@@ -212,6 +223,21 @@ question or tap a suggested one → get a streamed, cited answer; ask follow-ups
 > reranker) once — expect a delay on the very first run, then it's fast.
 > On Vercel serverless these are heavy (cold starts / function duration); the
 > demo is most reliable running on a Node host or locally.
+
+**Groq token controls.** Only answer generation uses Groq. To stay within the
+free tier, the ask route trims context (`RAG_KEEP_CHUNKS`, `RAG_CHUNK_CHARS`,
+`RAG_HISTORY_MESSAGES`), rate-limits questions per IP
+(`RAG_MAX_QUESTIONS_PER_MIN/DAY`), and enforces a global daily token budget
+(`RAG_DAILY_TOKEN_BUDGET`) — past which answers pause for the day (upload/search
+still work). Every answer's token usage is logged to `analytics_events`
+(`type = 'rag_ask'`) for the budget check and monitoring.
+
+**Answer caching.** First-turn questions (no prior chat) are cached per document
+in `rag_answer_cache` keyed by the normalized question — a repeat/identical
+question returns instantly with **zero Groq tokens** (and bypasses the token
+budget). The cache is cleared automatically when the document is deleted/expires.
+Run `db/schema.sql` to create the table; without it, caching is skipped
+gracefully.
 
 ## Security
 

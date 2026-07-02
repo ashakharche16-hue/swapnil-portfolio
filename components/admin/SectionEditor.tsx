@@ -10,7 +10,6 @@ import type {
   DisplaySegment,
   ExperienceGroup,
   ExperienceItem,
-  IconName,
   Metric,
   RecColumn,
   RecItem,
@@ -21,7 +20,6 @@ import type {
 import { saveSection } from "@/app/(admin)/admin/sections/actions";
 import {
   Field,
-  IconSelect,
   Repeater,
   SaveBar,
   TagList,
@@ -643,13 +641,6 @@ function ContactEditor({
   const [availability, setAvailability] = useState(
     (content.availability as string) ?? "",
   );
-  const cta0 = (content.cta as CTA) ?? { label: "", href: "" };
-  const [ctaLabel, setCtaLabel] = useState(cta0.label);
-  const [ctaHref, setCtaHref] = useState(cta0.href);
-  const [ctaIcon, setCtaIcon] = useState<IconName>(cta0.icon ?? "mail");
-  const [rows, setRows] = useState<ContactRow[]>(
-    (content.rows as ContactRow[]) ?? [],
-  );
 
   function build() {
     const segments: DisplaySegment[] = [];
@@ -661,8 +652,10 @@ function ContactEditor({
       lead: segments,
       blurb,
       availability,
-      cta: { ...cta0, label: ctaLabel, href: ctaHref, icon: ctaIcon },
-      rows,
+      // Preserved for shape compatibility — no longer shown (replaced by the
+      // built-in form + LinkedIn/Resume buttons).
+      cta: (content.cta as CTA) ?? { label: "", href: "" },
+      rows: (content.rows as ContactRow[]) ?? [],
     });
   }
 
@@ -691,65 +684,12 @@ function ContactEditor({
         </Field>
       </section>
 
-      <section className="flex flex-col gap-4">
-        <h2 className="font-mono text-xs uppercase tracking-wider text-accent">
-          Primary button
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Label">
-            <TextInput value={ctaLabel} onChange={setCtaLabel} />
-          </Field>
-          <Field label="Link">
-            <TextInput value={ctaHref} onChange={setCtaHref} />
-          </Field>
-          <Field label="Icon">
-            <IconSelect value={ctaIcon} onChange={setCtaIcon} />
-          </Field>
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-4 font-mono text-xs uppercase tracking-wider text-accent">
-          Contact methods
-        </h2>
-        <Repeater
-          items={rows}
-          onChange={setRows}
-          create={(): ContactRow => ({ icon: "mail", label: "", value: "" })}
-          addLabel="Add method"
-          title={(r) => r.label || "New method"}
-          render={(r, update) => (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Icon">
-                  <IconSelect
-                    value={r.icon}
-                    onChange={(v) => update({ icon: v })}
-                  />
-                </Field>
-                <Field label="Label">
-                  <TextInput
-                    value={r.label}
-                    onChange={(v) => update({ label: v })}
-                  />
-                </Field>
-              </div>
-              <Field label="Value">
-                <TextInput
-                  value={r.value}
-                  onChange={(v) => update({ value: v })}
-                />
-              </Field>
-              <Field label="Link (optional)">
-                <TextInput
-                  value={r.href ?? ""}
-                  onChange={(v) => update({ href: v })}
-                />
-              </Field>
-            </>
-          )}
-        />
-      </section>
+      <p className="text-sm text-muted">
+        The contact section shows a built-in <strong>message form</strong> (no
+        exposed email/phone). The <strong>LinkedIn</strong> and{" "}
+        <strong>Resume</strong> buttons use the URLs set in{" "}
+        <strong>Profile &amp; hero</strong>.
+      </p>
 
       <SaveBar onSave={build} />
     </Shell>

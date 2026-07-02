@@ -132,6 +132,20 @@ create table if not exists rag_messages (
 create index if not exists rag_messages_lookup_idx
   on rag_messages (document_id, session_id, created_at);
 
+-- rag_answer_cache — first-turn Q→A cache so repeat questions on the same
+-- document return instantly with zero Groq tokens. Cleared when the doc is
+-- deleted (cascade) / expires.
+create table if not exists rag_answer_cache (
+  id            uuid primary key default gen_random_uuid(),
+  document_id   uuid not null references rag_documents (id) on delete cascade,
+  question_norm text not null,
+  question      text not null,
+  answer        text not null,
+  sources       jsonb not null default '[]'::jsonb,
+  created_at    timestamptz not null default now(),
+  unique (document_id, question_norm)
+);
+
 -- Cosine similarity search within one document (returns page for citations).
 -- Drop first: the return type changed (added `page`), which CREATE OR REPLACE
 -- cannot do on an existing function.
@@ -163,6 +177,7 @@ alter table analytics_events    enable row level security;
 alter table rag_documents       enable row level security;
 alter table rag_chunks          enable row level security;
 alter table rag_messages        enable row level security;
+alter table rag_answer_cache    enable row level security;
 
 -- Public read of site content.
 drop policy if exists "public read profile" on profile;
