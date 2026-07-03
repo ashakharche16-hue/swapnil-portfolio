@@ -41,6 +41,11 @@ rationale behind each component.
   Supabase and emailed to you (Resend), with honeypot + rate-limit + quota caps.
 - Content is served from Supabase, with an automatic fallback to a local seed so
   the site always renders (even with no keys configured).
+- **SEO & social** — dynamic OpenGraph/Twitter card image (`next/og`),
+  `sitemap.xml`, `robots.txt`, canonical URLs, web manifest, theme-color, and
+  Schema.org Person, so shared links (LinkedIn/résumé) render a polished preview.
+- **Lighthouse (mobile):** Performance 96 · Accessibility 100 · Best Practices
+  100 · SEO 100 (production build).
 
 ## Stack
 
@@ -221,8 +226,14 @@ question or tap a suggested one → get a streamed, cited answer; ask follow-ups
 
 > The first upload/question downloads the local models (~30 MB embedder, ~90 MB
 > reranker) once — expect a delay on the very first run, then it's fast.
-> On Vercel serverless these are heavy (cold starts / function duration); the
-> demo is most reliable running on a Node host or locally.
+>
+> **On Vercel:** models cache to `/tmp` (the only writable path), and the
+> reranker is **disabled by default** (`RAG_RERANK` unset ⇒ off on Vercel) to cut
+> cold-start weight — vector search alone still answers well. For best results
+> raise the function **Memory** in Vercel → Settings → Functions. Because `/tmp`
+> is wiped between cold starts, the embedder re-downloads occasionally; for a
+> consistently fast demo, run the RAG API on an always-on Node host
+> (Render/Railway/Fly) and point the site at it.
 
 **Groq token controls.** Only answer generation uses Groq. To stay within the
 free tier, the ask route trims context (`RAG_KEEP_CHUNKS`, `RAG_CHUNK_CHARS`,

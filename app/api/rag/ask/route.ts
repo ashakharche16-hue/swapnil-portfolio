@@ -149,7 +149,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const top = await rerank(searchQuery, retrieved, ragConfig.keepChunks());
+  // Rerank for precision, unless disabled (e.g. serverless) — then take the
+  // top matches by vector similarity, which match_chunks already orders.
+  const keep = ragConfig.keepChunks();
+  const top = ragConfig.rerankEnabled()
+    ? await rerank(searchQuery, retrieved, keep)
+    : retrieved.slice(0, keep);
 
   const sources: Source[] = top.map((m, i) => ({
     n: i + 1,

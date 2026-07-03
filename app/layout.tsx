@@ -1,7 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { seed } from "@/db/seed";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 // Fraunces (serif) — name + section display headings only.
 const fraunces = Fraunces({
@@ -25,16 +28,45 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Swapnil Kharche — Software Development Manager & Engineering Leader",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default:
+      "Swapnil Kharche — Software Development Manager & Engineering Leader",
+    template: "%s · Swapnil Kharche",
+  },
   description:
     "Swapnil Kharche — Software Development Manager and Technical Lead with 12+ years modernizing mission-critical systems across Government, Healthcare, E-commerce and Financial domains. Based in Pune, India.",
+  applicationName: "Swapnil Kharche — Portfolio",
   authors: [{ name: "Swapnil Kharche" }],
+  creator: "Swapnil Kharche",
+  keywords: [
+    "Swapnil Kharche",
+    "Software Development Manager",
+    "Engineering Manager",
+    "Technical Lead",
+    "Staff Engineer",
+    "Software Architecture",
+    "RAG",
+    "Next.js",
+    "AWS",
+    "Java",
+    "Spring Boot",
+    "Pune",
+  ],
+  alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
   openGraph: {
     type: "profile",
+    url: SITE_URL,
+    siteName: "Swapnil Kharche",
     title:
       "Swapnil Kharche — Software Development Manager & Engineering Leader",
     description:
-      "12+ years modernizing mission-critical systems. Engineering leadership, architecture, and AI-driven engineering.",
+      "12+ years modernizing mission-critical systems. Engineering leadership, architecture, and AI-driven engineering — with a live RAG demo you can try.",
     locale: "en_IN",
   },
   twitter: {
@@ -42,6 +74,32 @@ export const metadata: Metadata = {
     title: "Swapnil Kharche — Software Development Manager",
     description: "Engineering leader. Architect. AI-driven engineering.",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0B0F1A" },
+    { media: "(prefers-color-scheme: light)", color: "#FAFAF7" },
+  ],
+};
+
+// Schema.org Person for rich results (kept in sync with the seed identity).
+const personLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: seed.identity.name,
+  jobTitle: "Software Development Manager",
+  description:
+    "Software Development Manager and Technical Lead with 12+ years modernizing mission-critical platforms.",
+  url: SITE_URL,
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Pune",
+    addressRegion: "Maharashtra",
+    addressCountry: "IN",
+  },
+  worksFor: { "@type": "Organization", name: "Deloitte Consulting LLP" },
+  sameAs: [seed.identity.linkedinUrl].filter(Boolean),
 };
 
 // Runs before paint to set the saved theme and avoid a flash of the wrong one.
@@ -61,6 +119,10 @@ export default function RootLayout({
     >
       <body>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd) }}
+        />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

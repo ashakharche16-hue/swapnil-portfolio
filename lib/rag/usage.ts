@@ -13,6 +13,16 @@ export const ragConfig = {
   maxPerMin: () => num("RAG_MAX_QUESTIONS_PER_MIN", 8),
   maxPerDay: () => num("RAG_MAX_QUESTIONS_PER_DAY", 100),
   dailyTokenBudget: () => num("RAG_DAILY_TOKEN_BUDGET", 300000),
+  /**
+   * Whether to run the cross-encoder reranker. It improves answer precision but
+   * loads a ~90MB model — heavy for serverless cold starts. Defaults ON, but
+   * OFF on Vercel (where vector search alone is more reliable). Force with
+   * RAG_RERANK=1 / 0.
+   */
+  rerankEnabled: () =>
+    process.env.RAG_RERANK
+      ? process.env.RAG_RERANK === "1" || process.env.RAG_RERANK === "true"
+      : !process.env.VERCEL,
 };
 
 async function countAsks(
