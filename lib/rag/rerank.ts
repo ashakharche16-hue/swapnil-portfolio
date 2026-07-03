@@ -1,3 +1,5 @@
+import os from "os";
+import path from "path";
 import type {
   PreTrainedModel,
   PreTrainedTokenizer,
@@ -17,8 +19,11 @@ let modelPromise: Promise<{
 async function getReranker() {
   if (!modelPromise) {
     modelPromise = (async () => {
-      const { AutoTokenizer, AutoModelForSequenceClassification } =
+      const { AutoTokenizer, AutoModelForSequenceClassification, env } =
         await import("@huggingface/transformers");
+      env.cacheDir =
+        process.env.TRANSFORMERS_CACHE || path.join(os.tmpdir(), "hf-cache");
+      env.allowLocalModels = false;
       const id = "Xenova/ms-marco-MiniLM-L-6-v2";
       const [tokenizer, model] = await Promise.all([
         AutoTokenizer.from_pretrained(id),
@@ -26,6 +31,11 @@ async function getReranker() {
       ]);
       return { tokenizer, model };
     })();
+    // Don't cache a rejected promise (self-heal on transient load failure).
+    modelPromise.catch((err) => {
+      console.error("[rag] reranker failed to load:", err);
+      modelPromise = null;
+    });
   }
   return modelPromise;
 }
