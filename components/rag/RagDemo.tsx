@@ -241,6 +241,10 @@ export function RagDemo() {
         Documents auto-delete after 24 hours. Please don&apos;t upload sensitive
         material.
       </p>
+      <p className="mt-1 font-mono text-xs text-dim">
+        Runs on a free tier — usage is rate-limited, and answers may pause
+        briefly if the daily limit is reached. Please use it sparingly.
+      </p>
 
       {/* How to use */}
       <ol className="mt-6 flex flex-col gap-1.5 text-sm text-muted">

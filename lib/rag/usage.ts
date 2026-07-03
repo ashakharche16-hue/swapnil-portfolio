@@ -9,6 +9,13 @@ const num = (name: string, fallback: number) => {
 export const ragConfig = {
   keepChunks: () => num("RAG_KEEP_CHUNKS", 4),
   chunkChars: () => num("RAG_CHUNK_CHARS", 800),
+  /**
+   * Documents whose full text is at/under this many characters skip retrieval
+   * and use the WHOLE document as context (like uploading a file to ChatGPT) —
+   * so whole-document questions ("who is this about?", "summarize") work. Larger
+   * docs fall back to retrieval.
+   */
+  fullDocChars: () => num("RAG_FULLDOC_CHARS", 8000),
   historyMessages: () => num("RAG_HISTORY_MESSAGES", 6),
   maxPerMin: () => num("RAG_MAX_QUESTIONS_PER_MIN", 8),
   maxPerDay: () => num("RAG_MAX_QUESTIONS_PER_DAY", 100),

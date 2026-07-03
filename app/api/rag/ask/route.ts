@@ -131,42 +131,70 @@ export async function POST(req: Request) {
   if (!budget.ok)
     return new Response(budget.message, { status: budget.status });
 
-  const searchQuery = await condenseQuestion(priorTurns, question);
-
-  const queryEmbedding = await embedOne(searchQuery);
-  const { data: matches, error } = await admin.rpc("match_chunks", {
-    query_embedding: toVector(queryEmbedding),
-    match_document_id: documentId,
-    match_count: RETRIEVE,
-  });
-  if (error) return new Response("Search failed.", { status: 500 });
-
-  const retrieved = (matches ?? []) as Match[];
-  if (retrieved.length === 0) {
+  // Load every chunk so we can decide between full-document context (small docs)
+  // and retrieval (large docs).
+  const { data: allChunksData } = await admin
+    .from("rag_chunks")
+    .select("content, chunk_index, page")
+    .eq("document_id", documentId)
+    .order("chunk_index");
+  const allChunks = (allChunksData ?? []) as {
+    content: string;
+    chunk_index: number;
+    page: number | null;
+  }[];
+  if (allChunks.length === 0) {
     return new Response(
       "This document has expired or is empty — please upload it again.",
       { status: 404 },
     );
   }
 
-  // Rerank for precision, unless disabled (e.g. serverless) — then take the
-  // top matches by vector similarity, which match_chunks already orders.
-  const keep = ragConfig.keepChunks();
-  const top = ragConfig.rerankEnabled()
-    ? await rerank(searchQuery, retrieved, keep)
-    : retrieved.slice(0, keep);
+  const totalChars = allChunks.reduce((s, c) => s + c.content.length, 0);
+  const chunkChars = ragConfig.chunkChars();
+
+  let top: { content: string; page: number | null }[];
+  let useFull = false;
+
+  if (totalChars <= ragConfig.fullDocChars()) {
+    // Small document → send the whole thing (like a file upload). Makes
+    // whole-document questions ("who is this about?", "summarize") reliable.
+    useFull = true;
+    top = allChunks.map((c) => ({ content: c.content, page: c.page }));
+  } else {
+    // Large document → retrieve the most relevant chunks.
+    const searchQuery = await condenseQuestion(priorTurns, question);
+    const queryEmbedding = await embedOne(searchQuery);
+    const { data: matches, error } = await admin.rpc("match_chunks", {
+      query_embedding: toVector(queryEmbedding),
+      match_document_id: documentId,
+      match_count: RETRIEVE,
+    });
+    if (error) return new Response("Search failed.", { status: 500 });
+
+    const retrieved = (matches ?? []) as Match[];
+    const keep = ragConfig.keepChunks();
+    let picked = ragConfig.rerankEnabled()
+      ? await rerank(searchQuery, retrieved, keep)
+      : retrieved.slice(0, keep);
+
+    // Always include the document header (chunk 0 — name/title/summary) so
+    // identity/summary questions have it even when it isn't a top match.
+    if (!picked.some((p) => p.chunk_index === 0)) {
+      picked = [allChunks[0] as Match, ...picked].slice(0, keep + 1);
+    }
+    top = picked.map((m) => ({ content: m.content, page: m.page }));
+  }
 
   const sources: Source[] = top.map((m, i) => ({
     n: i + 1,
     page: m.page,
     snippet: m.content.replace(/\s+/g, " ").slice(0, 180).trim(),
   }));
-  // Truncate each chunk to bound input tokens sent to the model.
-  const chunkChars = ragConfig.chunkChars();
   const context = top
     .map(
       (m, i) =>
-        `[${i + 1}]${m.page ? ` (p.${m.page})` : ""} ${m.content.slice(0, chunkChars)}`,
+        `[${i + 1}]${m.page ? ` (p.${m.page})` : ""} ${useFull ? m.content : m.content.slice(0, chunkChars)}`,
     )
     .join("\n\n");
 
