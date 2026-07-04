@@ -46,54 +46,34 @@ export function RagDemo() {
   const [mode, setMode] = useState<Mode>("profile");
   const [sessionId, setSessionId] = useState("");
   const [doc, setDoc] = useState<Doc | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Separate thread per mode — kept in state so toggling preserves each
+  // conversation, but NOT persisted, so a browser refresh starts fresh.
+  const [msgs, setMsgs] = useState<Record<Mode, Message[]>>({
+    profile: [],
+    upload: [],
+  });
   const [question, setQuestion] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  // Restore session + mode + document + conversation on load.
-  useEffect(() => {
-    let sid = localStorage.getItem("rag-session");
-    if (!sid) {
-      sid = uuid();
-      localStorage.setItem("rag-session", sid);
-    }
-    setSessionId(sid);
-    const savedMode = localStorage.getItem("rag-mode");
-    if (savedMode === "upload" || savedMode === "profile") setMode(savedMode);
-    try {
-      const d = localStorage.getItem("rag-doc");
-      if (d) setDoc(JSON.parse(d));
-      const m = localStorage.getItem("rag-messages");
-      if (m) setMessages(JSON.parse(m));
-    } catch {
-      // ignore corrupt storage
-    }
-    setHydrated(true);
-  }, []);
+  const messages = msgs[mode];
+  const updateMsgs = (target: Mode, updater: (prev: Message[]) => Message[]) =>
+    setMsgs((all) => ({ ...all, [target]: updater(all[target]) }));
 
+  // Fresh session per page load (a browser refresh resets the demo).
   useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem("rag-mode", mode);
-    if (doc) localStorage.setItem("rag-doc", JSON.stringify(doc));
-    else localStorage.removeItem("rag-doc");
-  }, [mode, doc, hydrated]);
-  useEffect(() => {
-    if (hydrated)
-      localStorage.setItem("rag-messages", JSON.stringify(messages));
-  }, [messages, hydrated]);
+    setSessionId(uuid());
+  }, []);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   function switchMode(next: Mode) {
     if (next === mode) return;
-    setMode(next);
-    setMessages([]);
+    setMode(next); // keep both threads; just switch which is shown
     setUploadError(null);
   }
 
@@ -133,7 +113,7 @@ export function RagDemo() {
           pageCount: data.pageCount!,
           suggestions: data.suggestions ?? [],
         });
-        setMessages([]);
+        updateMsgs("upload", () => []);
       }
     } catch (err) {
       setUploadError(
@@ -148,9 +128,10 @@ export function RagDemo() {
   async function ask(text: string) {
     const q = text.trim();
     if (asking || !q) return;
-    if (mode === "upload" && !doc) return;
+    const askMode = mode;
+    if (askMode === "upload" && !doc) return;
 
-    const priorHistory = messages.map((m) => ({
+    const priorHistory = msgs[askMode].map((m) => ({
       role: m.role,
       content: m.content,
     }));
@@ -158,7 +139,7 @@ export function RagDemo() {
     setAsking(true);
     setQuestion("");
     const assistantId = uuid();
-    setMessages((prev) => [
+    updateMsgs(askMode, (prev) => [
       ...prev,
       { id: uuid(), role: "user", content: q },
       { id: assistantId, role: "assistant", content: "" },
@@ -166,7 +147,7 @@ export function RagDemo() {
 
     try {
       const res =
-        mode === "profile"
+        askMode === "profile"
           ? await fetch("/api/rag/ask-profile", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -184,7 +165,7 @@ export function RagDemo() {
 
       if (!res.ok || !res.body) {
         const errText = (await res.text()) || "Something went wrong.";
-        setMessages((prev) =>
+        updateMsgs(askMode, (prev) =>
           prev.map((m) =>
             m.id === assistantId ? { ...m, content: errText } : m,
           ),
@@ -199,19 +180,19 @@ export function RagDemo() {
         const { value, done } = await reader.read();
         if (done) break;
         const token = decoder.decode(value, { stream: true });
-        setMessages((prev) =>
+        updateMsgs(askMode, (prev) =>
           prev.map((m) =>
             m.id === assistantId ? { ...m, content: m.content + token } : m,
           ),
         );
       }
       if (sources) {
-        setMessages((prev) =>
+        updateMsgs(askMode, (prev) =>
           prev.map((m) => (m.id === assistantId ? { ...m, sources } : m)),
         );
       }
     } catch {
-      setMessages((prev) =>
+      updateMsgs(askMode, (prev) =>
         prev.map((m) =>
           m.id === assistantId
             ? { ...m, content: "Something went wrong. Please try again." }
@@ -229,7 +210,7 @@ export function RagDemo() {
     const priorUser = [...messages.slice(0, idx)]
       .reverse()
       .find((m) => m.role === "user");
-    setMessages((prev) =>
+    updateMsgs(mode, (prev) =>
       prev.map((m) => (m.id === msg.id ? { ...m, feedback: rating } : m)),
     );
     try {
@@ -249,7 +230,7 @@ export function RagDemo() {
 
   function reset() {
     setDoc(null);
-    setMessages([]);
+    updateMsgs("upload", () => []);
   }
 
   const showChat = mode === "profile" || (mode === "upload" && !!doc);
@@ -315,8 +296,8 @@ export function RagDemo() {
                 </span>
                 <span className="font-medium text-body">{opt.title}</span>
                 {active && (
-                  <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-accent">
-                    ● Selected
+                  <span aria-hidden="true" className="text-accent">
+                    ✓
                   </span>
                 )}
               </span>
