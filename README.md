@@ -220,9 +220,16 @@ reranking run locally at $0**; only answer generation uses Groq's free tier.
    the `match_chunks` function, and enables `pgvector`).
 3. `npm run dev:clean`.
 
-**Use**: open `/rag` → upload a text-based PDF (or an image to OCR) → ask a
-question or tap a suggested one → get a streamed, cited answer; ask follow-ups
-(it remembers the thread). Uploaded documents auto-delete after 24 hours.
+**Two modes** (toggle at the top of `/rag`):
+
+- **Ask about Swapnil** (default) — recruiters ask about his experience/skills
+  with no upload; answered from the live site profile assembled server-side
+  (`lib/rag/profile-context.ts`), so it's always in sync with `/admin` edits.
+  Served by `/api/rag/ask-profile` (same rate-limit/budget guards, in-memory
+  answer cache).
+- **Upload a document** — upload a text PDF (or image to OCR) → ask a question or
+  tap a suggested one → streamed, cited answer with follow-up memory. Uploaded
+  documents auto-delete after 24 hours.
 
 > The first upload/question downloads the local models (~30 MB embedder, ~90 MB
 > reranker) once — expect a delay on the very first run, then it's fast.

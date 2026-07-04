@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PROFILE_SUGGESTIONS } from "@/lib/rag/profile-context";
 
 interface Source {
   n: number;
@@ -24,6 +25,8 @@ interface Doc {
   suggestions: string[];
 }
 
+type Mode = "profile" | "upload";
+
 function uuid() {
   return crypto.randomUUID();
 }
@@ -40,6 +43,7 @@ function decodeSources(header: string | null): Source[] | undefined {
 }
 
 export function RagDemo() {
+  const [mode, setMode] = useState<Mode>("profile");
   const [sessionId, setSessionId] = useState("");
   const [doc, setDoc] = useState<Doc | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -51,7 +55,7 @@ export function RagDemo() {
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  // Restore session + document + conversation on load.
+  // Restore session + mode + document + conversation on load.
   useEffect(() => {
     let sid = localStorage.getItem("rag-session");
     if (!sid) {
@@ -59,6 +63,8 @@ export function RagDemo() {
       localStorage.setItem("rag-session", sid);
     }
     setSessionId(sid);
+    const savedMode = localStorage.getItem("rag-mode");
+    if (savedMode === "upload" || savedMode === "profile") setMode(savedMode);
     try {
       const d = localStorage.getItem("rag-doc");
       if (d) setDoc(JSON.parse(d));
@@ -70,12 +76,12 @@ export function RagDemo() {
     setHydrated(true);
   }, []);
 
-  // Persist across refreshes.
   useEffect(() => {
     if (!hydrated) return;
+    localStorage.setItem("rag-mode", mode);
     if (doc) localStorage.setItem("rag-doc", JSON.stringify(doc));
     else localStorage.removeItem("rag-doc");
-  }, [doc, hydrated]);
+  }, [mode, doc, hydrated]);
   useEffect(() => {
     if (hydrated)
       localStorage.setItem("rag-messages", JSON.stringify(messages));
@@ -83,6 +89,13 @@ export function RagDemo() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  function switchMode(next: Mode) {
+    if (next === mode) return;
+    setMode(next);
+    setMessages([]);
+    setUploadError(null);
+  }
 
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -105,7 +118,7 @@ export function RagDemo() {
       try {
         data = JSON.parse(raw);
       } catch {
-        // non-JSON response (e.g. an error page)
+        // non-JSON response
       }
       if (!res.ok) {
         setUploadError(
@@ -134,7 +147,14 @@ export function RagDemo() {
 
   async function ask(text: string) {
     const q = text.trim();
-    if (!doc || asking || !q) return;
+    if (asking || !q) return;
+    if (mode === "upload" && !doc) return;
+
+    const priorHistory = messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
     setAsking(true);
     setQuestion("");
     const assistantId = uuid();
@@ -145,15 +165,22 @@ export function RagDemo() {
     ]);
 
     try {
-      const res = await fetch("/api/rag/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          documentId: doc.documentId,
-          sessionId,
-          question: q,
-        }),
-      });
+      const res =
+        mode === "profile"
+          ? await fetch("/api/rag/ask-profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ question: q, history: priorHistory }),
+            })
+          : await fetch("/api/rag/ask", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                documentId: doc!.documentId,
+                sessionId,
+                question: q,
+              }),
+            });
 
       if (!res.ok || !res.body) {
         const errText = (await res.text()) || "Something went wrong.";
@@ -197,7 +224,7 @@ export function RagDemo() {
   }
 
   async function sendFeedback(msg: Message, rating: "up" | "down") {
-    if (!doc || msg.feedback) return;
+    if (msg.feedback) return;
     const idx = messages.findIndex((m) => m.id === msg.id);
     const priorUser = [...messages.slice(0, idx)]
       .reverse()
@@ -210,7 +237,7 @@ export function RagDemo() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          documentId: doc.documentId,
+          documentId: doc?.documentId ?? "profile",
           question: priorUser?.content ?? "",
           rating,
         }),
@@ -225,86 +252,131 @@ export function RagDemo() {
     setMessages([]);
   }
 
+  const showChat = mode === "profile" || (mode === "upload" && !!doc);
+  const suggestions =
+    mode === "profile" ? PROFILE_SUGGESTIONS : (doc?.suggestions ?? []);
+
   return (
     <div className="mx-auto max-w-2xl">
       <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">
         Live demo · RAG
       </p>
-      <h1 className="mt-3 font-serif text-4xl text-body">Ask my documents</h1>
+      <h1 className="mt-3 font-serif text-4xl text-body">
+        {mode === "profile" ? "Ask about Swapnil" : "Ask my documents"}
+      </h1>
       <p className="mt-3 text-muted">
-        Upload a PDF (or an image to OCR) and ask questions answered only from
-        its contents, with citations and follow-up memory. Parsing, embeddings,
-        and reranking run locally at no cost; answers stream from a fast open
-        model.
+        {mode === "profile"
+          ? "Ask about Swapnil's experience, skills, and impact — answered from his live profile."
+          : "Upload a PDF (or an image to OCR) and ask questions answered only from its contents, with citations."}{" "}
+        Answers stream from a fast open model; retrieval runs locally.
       </p>
       <p className="mt-2 font-mono text-xs text-dim">
-        Documents auto-delete after 24 hours. Please don&apos;t upload sensitive
-        material.
-      </p>
-      <p className="mt-1 font-mono text-xs text-dim">
         Runs on a free tier — usage is rate-limited, and answers may pause
         briefly if the daily limit is reached. Please use it sparingly.
       </p>
 
-      {/* How to use */}
-      <ol className="mt-6 flex flex-col gap-1.5 text-sm text-muted">
-        <li>
-          <span className="mr-2 font-mono text-xs text-accent">1</span>
-          Upload a text-based PDF (or an image to OCR).
-        </li>
-        <li>
-          <span className="mr-2 font-mono text-xs text-accent">2</span>
-          Ask a question — or tap a suggested one.
-        </li>
-        <li>
-          <span className="mr-2 font-mono text-xs text-accent">3</span>
-          Read the cited answer, then ask follow-ups — it remembers the thread.
-        </li>
-      </ol>
+      {/* Mode picker — clear option cards */}
+      <p className="mt-6 font-mono text-xs uppercase tracking-wider text-muted">
+        Choose one to start
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {(
+          [
+            {
+              m: "profile",
+              emoji: "👤",
+              title: "Ask about Swapnil",
+              desc: "For recruiters — his experience, skills & impact. No upload needed.",
+            },
+            {
+              m: "upload",
+              emoji: "📄",
+              title: "Chat with a document",
+              desc: "Upload a PDF or image and ask questions about its contents.",
+            },
+          ] as const
+        ).map((opt) => {
+          const active = mode === opt.m;
+          return (
+            <button
+              key={opt.m}
+              type="button"
+              onClick={() => switchMode(opt.m)}
+              aria-pressed={active}
+              className={`flex flex-col gap-1 rounded-2xl border p-4 text-left transition-colors ${
+                active
+                  ? "bg-accent-soft border-accent"
+                  : "hover:border-accent/60 border-hairline bg-elev"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span aria-hidden="true" className="text-lg">
+                  {opt.emoji}
+                </span>
+                <span className="font-medium text-body">{opt.title}</span>
+                {active && (
+                  <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-accent">
+                    ● Selected
+                  </span>
+                )}
+              </span>
+              <span className="text-sm text-muted">{opt.desc}</span>
+            </button>
+          );
+        })}
+      </div>
 
-      {/* Upload / document status */}
-      {!doc ? (
-        <div className="mt-8 rounded-2xl border border-hairline bg-elev p-5">
-          <label className="font-mono text-xs uppercase tracking-wider text-muted">
-            Upload a document
-          </label>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/pdf,image/png,image/jpeg,image/webp"
-            onChange={onUpload}
-            disabled={uploading}
-            className="mt-3 block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-hairline file:bg-soft file:px-4 file:py-2 file:text-body disabled:opacity-60"
-          />
-          {uploading && (
-            <p className="mt-3 font-mono text-xs text-dim">
-              Reading &amp; indexing… (first run downloads the local models)
-            </p>
+      {/* Upload mode: how-to + upload/status */}
+      {mode === "upload" && (
+        <>
+          {!doc ? (
+            <div className="mt-6 rounded-2xl border border-hairline bg-elev p-5">
+              <label className="font-mono text-xs uppercase tracking-wider text-muted">
+                Upload a document
+              </label>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/pdf,image/png,image/jpeg,image/webp"
+                onChange={onUpload}
+                disabled={uploading}
+                className="mt-3 block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-hairline file:bg-soft file:px-4 file:py-2 file:text-body disabled:opacity-60"
+              />
+              <p className="mt-3 font-mono text-xs text-dim">
+                Documents auto-delete after 24 hours. Don&apos;t upload
+                sensitive material.
+              </p>
+              {uploading && (
+                <p className="mt-2 font-mono text-xs text-dim">
+                  Reading &amp; indexing… (first run downloads the local models)
+                </p>
+              )}
+              {uploadError && (
+                <p role="alert" className="mt-2 text-sm text-red-400">
+                  {uploadError}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="mt-6 flex items-center justify-between rounded-2xl border border-hairline bg-elev px-5 py-3">
+              <span className="truncate font-mono text-xs text-muted">
+                📄 {doc.filename} · {doc.chunks} chunks
+                {doc.pageCount ? ` · ${doc.pageCount}p` : ""}
+              </span>
+              <button
+                type="button"
+                onClick={reset}
+                className="shrink-0 rounded-lg border border-hairline px-3 py-1.5 font-mono text-xs text-muted hover:text-body"
+              >
+                Upload another
+              </button>
+            </div>
           )}
-          {uploadError && (
-            <p role="alert" className="mt-3 text-sm text-red-400">
-              {uploadError}
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className="mt-8 flex items-center justify-between rounded-2xl border border-hairline bg-elev px-5 py-3">
-          <span className="truncate font-mono text-xs text-muted">
-            📄 {doc.filename} · {doc.chunks} chunks
-            {doc.pageCount ? ` · ${doc.pageCount}p` : ""}
-          </span>
-          <button
-            type="button"
-            onClick={reset}
-            className="shrink-0 rounded-lg border border-hairline px-3 py-1.5 font-mono text-xs text-muted hover:text-body"
-          >
-            Upload another
-          </button>
-        </div>
+        </>
       )}
 
       {/* Conversation */}
-      {doc && (
+      {showChat && (
         <div className="mt-4 flex flex-col gap-4">
           {messages.map((m) =>
             m.role === "user" ? (
@@ -377,18 +449,23 @@ export function RagDemo() {
           <div ref={endRef} />
 
           {/* Suggested starter questions */}
-          {messages.length === 0 && doc.suggestions.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {doc.suggestions.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => ask(s)}
-                  className="rounded-full border border-hairline bg-elev px-3 py-1.5 text-left text-sm text-muted hover:border-accent hover:text-body"
-                >
-                  {s}
-                </button>
-              ))}
+          {messages.length === 0 && suggestions.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="font-mono text-xs uppercase tracking-wider text-muted">
+                Try asking
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => ask(s)}
+                    className="rounded-full border border-hairline bg-elev px-3 py-1.5 text-left text-sm text-muted hover:border-accent hover:text-body"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -405,7 +482,11 @@ export function RagDemo() {
               value={question}
               maxLength={500}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask about the document…"
+              placeholder={
+                mode === "profile"
+                  ? "Ask a recruiter question…"
+                  : "Ask about the document…"
+              }
               disabled={asking}
               className="flex-1 rounded-lg border border-hairline bg-bg px-3 py-2.5 text-body shadow-lg outline-none focus:border-accent disabled:opacity-60"
             />
