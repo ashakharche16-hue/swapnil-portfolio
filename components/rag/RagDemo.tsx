@@ -67,7 +67,11 @@ export function RagDemo() {
   useEffect(() => {
     setSessionId(uuid());
   }, []);
+  // Auto-scroll to the latest turn — but only once a conversation exists.
+  // On mount `messages` is empty and the chat anchor already renders (profile
+  // mode), so scrolling then would push the page heading off-screen.
   useEffect(() => {
+    if (messages.length === 0) return;
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
