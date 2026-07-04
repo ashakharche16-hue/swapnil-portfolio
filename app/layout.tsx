@@ -121,7 +121,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME }} />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd) }}
+          dangerouslySetInnerHTML={{
+            // Escape "<" so no field can break out of the <script> tag.
+            __html: JSON.stringify(personLd).replace(/</g, "\\u003c"),
+          }}
         />
         <ThemeProvider>{children}</ThemeProvider>
       </body>

@@ -7,8 +7,9 @@ ships a **live, zero-cost RAG demo** (`/rag`) where visitors upload a PDF and as
 questions answered from its contents.
 
 See [`CLAUDE.md`](./CLAUDE.md) for the full product brief and slice-by-slice
-plan, and [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the system design and the
-rationale behind each component.
+plan, [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the system design and the
+rationale behind each component, and [`SECURITY.md`](./SECURITY.md) for the
+threat model and controls.
 
 ## Contents
 
@@ -114,9 +115,14 @@ Copy `.env.example` → `.env.local` and fill in values. **Never commit
 | `RAG_KEEP_CHUNKS`               | **no**  | Context chunks sent to the model (default `4`)                                               |
 | `RAG_CHUNK_CHARS`               | **no**  | Max chars per chunk in the prompt (default `800`)                                            |
 | `RAG_HISTORY_MESSAGES`          | **no**  | Prior chat messages kept for context (default `6`)                                           |
+| `RAG_FULLDOC_CHARS`             | **no**  | Docs ≤ N chars use whole-doc context instead of retrieval (default `8000`)                   |
 | `RAG_MAX_QUESTIONS_PER_MIN`     | **no**  | Per-IP question rate limit / minute (default `8`)                                            |
 | `RAG_MAX_QUESTIONS_PER_DAY`     | **no**  | Per-IP question rate limit / day (default `100`)                                             |
+| `RAG_MAX_INGESTS_PER_HOUR`      | **no**  | Per-IP upload rate limit / hour (default `10`)                                               |
+| `RAG_MAX_INGESTS_PER_DAY`       | **no**  | Per-IP upload rate limit / day (default `30`)                                                |
 | `RAG_DAILY_TOKEN_BUDGET`        | **no**  | Global daily Groq token budget; answers pause once exceeded (default `300000`)               |
+| `RAG_MAX_ASKS_PER_DAY_GLOBAL`   | **no**  | Hard global cap on answered questions/day across all users (default `500`)                   |
+| `RAG_RERANK`                    | **no**  | Cross-encoder reranker on/off (`1`/`0`); default on locally, off on Vercel                   |
 
 > `NEXT_PUBLIC_*` are inlined into the client bundle at build time; every other
 > variable (service-role key, `GROQ_API_KEY`, `RESEND_API_KEY`, `ADMIN_EMAILS`,

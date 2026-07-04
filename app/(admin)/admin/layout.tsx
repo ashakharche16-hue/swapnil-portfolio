@@ -28,6 +28,7 @@ export default async function AdminLayout({
               href="/"
               className="font-mono text-xs text-muted hover:text-body"
               target="_blank"
+              rel="noopener noreferrer"
             >
               View site ↗
             </Link>

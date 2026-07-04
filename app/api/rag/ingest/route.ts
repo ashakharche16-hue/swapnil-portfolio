@@ -5,6 +5,7 @@ import { chunkPages } from "@/lib/rag/chunk";
 import { embed } from "@/lib/rag/embeddings";
 import { suggestQuestions } from "@/lib/rag/groq";
 import { toVector } from "@/lib/rag/store";
+import { checkIngestRate, logIngest } from "@/lib/rag/usage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -31,7 +32,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const form = await req.formData();
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid upload (expected multipart form data)." },
+      { status: 400 },
+    );
+  }
   const file = form.get("file");
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file uploaded." }, { status: 400 });
@@ -47,6 +56,14 @@ export async function POST(req: Request) {
       { error: "File too large (max 10 MB)." },
       { status: 400 },
     );
+  }
+
+  // Per-IP upload rate limit (parsing + OCR + embeddings are expensive).
+  const fwd = req.headers.get("x-forwarded-for");
+  const ip = fwd?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "";
+  const rate = await checkIngestRate(admin, ip);
+  if (!rate.ok) {
+    return NextResponse.json({ error: rate.message }, { status: rate.status });
   }
 
   // Best-effort cleanup of expired demo documents (cascades to chunks/messages).
@@ -130,6 +147,8 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+
+  void logIngest(admin, ip); // record for the rate limit (best-effort)
 
   return NextResponse.json({
     documentId: doc.id as string,

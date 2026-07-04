@@ -19,6 +19,8 @@ export const ragConfig = {
   historyMessages: () => num("RAG_HISTORY_MESSAGES", 6),
   maxPerMin: () => num("RAG_MAX_QUESTIONS_PER_MIN", 8),
   maxPerDay: () => num("RAG_MAX_QUESTIONS_PER_DAY", 100),
+  maxIngestsPerHour: () => num("RAG_MAX_INGESTS_PER_HOUR", 10),
+  maxIngestsPerDay: () => num("RAG_MAX_INGESTS_PER_DAY", 30),
   dailyTokenBudget: () => num("RAG_DAILY_TOKEN_BUDGET", 300000),
   /**
    * Hard global cap on ANSWERED questions per day across ALL users — a
@@ -38,19 +40,67 @@ export const ragConfig = {
       : !process.env.VERCEL,
 };
 
-async function countAsks(
+async function countEvents(
   admin: SupabaseClient,
+  type: string,
   sinceIso: string,
   ip?: string,
 ): Promise<number> {
   let q = admin
     .from("analytics_events")
     .select("id", { count: "exact", head: true })
-    .eq("type", "rag_ask")
+    .eq("type", type)
     .gte("created_at", sinceIso);
   if (ip) q = q.eq("meta->>ip", ip);
   const { count } = await q;
   return count ?? 0;
+}
+
+const countAsks = (admin: SupabaseClient, since: string, ip?: string) =>
+  countEvents(admin, "rag_ask", since, ip);
+
+/** Per-IP rate limit on document uploads (heavy: parsing + OCR + embeddings). */
+export async function checkIngestRate(
+  admin: SupabaseClient,
+  ip: string,
+): Promise<LimitResult> {
+  if (!ip) return { ok: true };
+  const now = Date.now();
+  const hourAgo = new Date(now - 3_600_000).toISOString();
+  const dayAgo = new Date(now - 86_400_000).toISOString();
+  try {
+    const [perHour, perDay] = await Promise.all([
+      countEvents(admin, "rag_ingest", hourAgo, ip),
+      countEvents(admin, "rag_ingest", dayAgo, ip),
+    ]);
+    if (
+      perHour >= ragConfig.maxIngestsPerHour() ||
+      perDay >= ragConfig.maxIngestsPerDay()
+    ) {
+      return {
+        ok: false,
+        status: 429,
+        message: "Too many uploads — please try again later.",
+      };
+    }
+  } catch (err) {
+    console.error("[rag] ingest rate check failed:", err);
+  }
+  return { ok: true };
+}
+
+/** Records an upload (for the ingest rate limit). */
+export async function logIngest(
+  admin: SupabaseClient,
+  ip: string,
+): Promise<void> {
+  try {
+    await admin
+      .from("analytics_events")
+      .insert({ type: "rag_ingest", path: "/rag", meta: { ip: ip || null } });
+  } catch (err) {
+    console.error("[rag] ingest log failed:", err);
+  }
 }
 
 export type LimitResult =

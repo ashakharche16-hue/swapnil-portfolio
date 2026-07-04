@@ -194,23 +194,22 @@ create policy "public read sections" on sections for select using (true);
 drop policy if exists "public read published posts" on blog_posts;
 create policy "public read published posts" on blog_posts for select using (published = true);
 
--- Public can submit the contact form, but not read submissions.
+-- contact_submissions, analytics_events, and every rag_* table are written and
+-- read ONLY server-side via the service role (which bypasses RLS). With RLS
+-- enabled and NO policy, the public anon key has zero access to them — uploaded
+-- documents, their chunks, conversations, contact submissions, and analytics
+-- are never readable or writable directly with the public key. All access is
+-- forced through the guarded API routes (rate limits, honeypot, caps).
+--
+-- These DROPs remove the earlier permissive "public rw / public insert"
+-- policies if they exist (safe to re-run); we intentionally do NOT recreate
+-- them.
 drop policy if exists "public insert submissions" on contact_submissions;
-create policy "public insert submissions" on contact_submissions for insert with check (true);
-
--- Public can log analytics events.
 drop policy if exists "public insert analytics" on analytics_events;
-create policy "public insert analytics" on analytics_events for insert with check (true);
-
--- RAG demo: public insert + read (tighten/scope in Slice 4.5).
 drop policy if exists "public rw rag_documents" on rag_documents;
-create policy "public rw rag_documents" on rag_documents for all using (true) with check (true);
-
 drop policy if exists "public rw rag_chunks" on rag_chunks;
-create policy "public rw rag_chunks" on rag_chunks for all using (true) with check (true);
-
 drop policy if exists "public rw rag_messages" on rag_messages;
-create policy "public rw rag_messages" on rag_messages for all using (true) with check (true);
+drop policy if exists "public rw rag_answer_cache" on rag_answer_cache;
 
 -- ============================================================================
 -- Storage — public `media` bucket for uploads (résumé PDF, images).

@@ -159,6 +159,14 @@ differing fields. `services/content.ts` assembles these into a typed
 - **No sign-up UI** — accounts are created by the owner in Supabase only.
 - **Secrets boundary** — service-role, Groq, Resend keys are server-only; only
   `NEXT_PUBLIC_*` reach the browser.
+- **Row-Level Security (defense at the database).** RLS is enabled on every
+  table. The public **anon key** (shipped to the browser) can only **read**
+  `profile`, `sections`, and published `blog_posts` — nothing else. All
+  sensitive tables (`contact_submissions`, `analytics_events`, and every
+  `rag_*` table) have **no anon policy at all**, so uploaded documents, their
+  chunks, conversations, and submissions are **never readable or writable with
+  the public key** — every write/read goes through a guarded server route using
+  the service role. See [`SECURITY.md`](./SECURITY.md) for the full threat model.
 
 ---
 
@@ -177,6 +185,23 @@ Upload ─▶ extract text ─▶ chunk ─▶ embed (local) ─▶ store vector
 Ask ─▶ [cache?] ─▶ condense ─▶ embed ─▶ vector search ─▶ rerank ─▶ Groq ─▶ stream
         cache.ts    (if history)         match_chunks    cross-enc   answer + cite
 ```
+
+### Two modes (`/rag`)
+
+A toggle offers two experiences:
+
+- **Ask about Swapnil** (default) — no upload. The whole owner profile is
+  assembled from the **live DB content** (`lib/rag/profile-context.ts`) and used
+  as context, so answers stay in sync with `/admin` edits. Served by
+  `/api/rag/ask-profile` (same guards; in-memory answer cache; no vector store
+  needed since the profile is small).
+- **Chat with a document** — upload a PDF/image and ask about it (the pipeline
+  above), served by `/api/rag/ask`.
+
+**Small documents skip retrieval.** If a document's full text is ≤
+`RAG_FULLDOC_CHARS`, the **whole document** is used as context (like a file
+upload) so whole-document questions ("who is this about?", "summarize") work;
+larger docs fall back to retrieval and always include the header chunk.
 
 ### Component choices — _why each_
 
@@ -221,17 +246,24 @@ Because Groq's free tier is finite, the demo is engineered to stay within it:
 
 - **Context trimming** — fewer/shorter chunks and limited history bound _input_
   tokens; `max_tokens` bounds output.
-- **Per-IP rate limit** — stops one visitor draining the quota.
+- **Per-IP rate limits** — on both questions (`checkQuestionRate`) and uploads
+  (`checkIngestRate`, since parsing/OCR/embedding is heavy) — stops one visitor
+  draining the quota.
 - **Global daily token budget** — once today's logged tokens exceed the budget,
   answering pauses (upload/search still work). Usage is logged to
   `analytics_events` (`type='rag_ask'`) — which doubles as observability.
-- **Answer cache** (`rag_answer_cache`) — first-turn questions are cached per
-  document; identical repeats return instantly with **zero tokens** and bypass
-  the budget. Only first-turn (context-free) questions are cached, to avoid
-  serving a wrong answer to a context-dependent follow-up.
+- **Hard global daily ask cap** (`RAG_MAX_ASKS_PER_DAY_GLOBAL`) — a fail-safe
+  ceiling on answered questions across _all_ users, so no traffic volume can
+  exhaust the free tiers. Analytics are pruned (>90 days) so the DB stays small.
+- **Answer cache** (`rag_answer_cache` for docs; in-memory for profile) —
+  first-turn questions are cached; identical repeats return instantly with
+  **zero tokens** and bypass the budget. Only first-turn (context-free)
+  questions are cached, to avoid serving a wrong answer to a follow-up.
 
 _Why these mirror the contact-form guards:_ same philosophy — never lose the
-core action, only throttle the expensive side effect.
+core action, only throttle the expensive side effect. The net effect: **the demo
+degrades gracefully (429 / "try again tomorrow") instead of ever spending
+money**, no matter how many users connect. See [`SECURITY.md`](./SECURITY.md).
 
 ---
 
