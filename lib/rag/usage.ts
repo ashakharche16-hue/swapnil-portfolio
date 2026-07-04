@@ -21,6 +21,12 @@ export const ragConfig = {
   maxPerDay: () => num("RAG_MAX_QUESTIONS_PER_DAY", 100),
   dailyTokenBudget: () => num("RAG_DAILY_TOKEN_BUDGET", 300000),
   /**
+   * Hard global cap on ANSWERED questions per day across ALL users — a
+   * fail-safe so a traffic spike can't exhaust the free tiers regardless of how
+   * many people connect. Answering pauses for the day once reached.
+   */
+  maxAsksPerDayGlobal: () => num("RAG_MAX_ASKS_PER_DAY_GLOBAL", 500),
+  /**
    * Whether to run the cross-encoder reranker. It improves answer precision but
    * loads a ~90MB model — heavy for serverless cold starts. Defaults ON, but
    * OFF on Vercel (where vector search alone is more reliable). Force with
@@ -82,32 +88,35 @@ export async function checkQuestionRate(
 }
 
 /**
- * Global daily Groq token budget. Only checked on a cache miss (i.e. when we're
- * actually about to spend tokens). Fails open on error.
+ * Global daily caps — a token budget AND a hard question count, across all
+ * users. Only checked on a cache miss (i.e. when we're about to spend). This is
+ * the fail-safe that keeps the demo inside the free tiers no matter how many
+ * people connect. Fails open on error.
  */
 export async function checkTokenBudget(
   admin: SupabaseClient,
 ): Promise<LimitResult> {
   const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
+  const paused = {
+    ok: false as const,
+    status: 503,
+    message:
+      "The live demo has reached today's usage limit. Please try again tomorrow.",
+  };
   try {
     const { data: today } = await admin
       .from("analytics_events")
       .select("meta")
       .eq("type", "rag_ask")
       .gte("created_at", dayAgo)
-      .limit(5000);
-    const used = (today ?? []).reduce((sum, r) => {
+      .limit(20000);
+    const rows = today ?? [];
+    if (rows.length >= ragConfig.maxAsksPerDayGlobal()) return paused;
+    const used = rows.reduce((sum, r) => {
       const t = Number((r.meta as { tokens?: number } | null)?.tokens);
       return sum + (Number.isFinite(t) ? t : 0);
     }, 0);
-    if (used >= ragConfig.dailyTokenBudget()) {
-      return {
-        ok: false,
-        status: 503,
-        message:
-          "The live demo has reached today's usage limit. Please try again tomorrow.",
-      };
-    }
+    if (used >= ragConfig.dailyTokenBudget()) return paused;
   } catch (err) {
     console.error("[rag] budget check failed:", err);
   }
@@ -137,6 +146,16 @@ export async function logAsk(
         model: data.model,
       },
     });
+    // Occasionally prune old analytics so the DB can't grow unbounded (keeps
+    // Supabase comfortably within the free tier). Fire-and-forget.
+    if (Math.random() < 0.02) {
+      const cutoff = new Date(Date.now() - 90 * 86_400_000).toISOString();
+      void admin
+        .from("analytics_events")
+        .delete()
+        .lt("created_at", cutoff)
+        .then(() => {});
+    }
   } catch (err) {
     console.error("[rag] usage log failed:", err);
   }

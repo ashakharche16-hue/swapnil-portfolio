@@ -84,7 +84,7 @@ export const seed: SiteContent = {
     heading: { num: "01", title: "About", meta: "/ engineering philosophy" },
     paragraphs: [
       "I translate **complex domain and architectural challenges** into secure, scalable platforms that reduce risk, optimize cost, and accelerate time-to-value. The work I'm proudest of is rarely the new, greenfield kind — it's the careful modernization of systems people already depend on, done without breaking their day.",
-      "For 12+ years I've led delivery on platforms that touch real users at scale: a government modernization program serving 5,000+ users and millions of transactions; an integration backbone wiring 52 partner systems; AI-driven internal tooling that reclaims engineering hours every week. My teams ship with quality because the practices — CI/CD discipline, structured documentation, audit-grade traceability — are non-negotiable, not afterthoughts.",
+      "For 12+ years I've led delivery on platforms that touch real users at scale — including **6+ years directly leading and mentoring cross-functional engineering teams**: a government modernization program serving 5,000+ users and millions of transactions; an integration backbone wiring 52 partner systems; AI-driven internal tooling that reclaims engineering hours every week. My teams ship with quality because the practices — CI/CD discipline, structured documentation, audit-grade traceability — are non-negotiable, not afterthoughts.",
     ],
   },
 
@@ -103,7 +103,7 @@ export const seed: SiteContent = {
         heading:
           "Leading multi-stream modernization of mission-critical government platforms.",
         summary:
-          "Direct accountability across engineering, architecture, AI integration, cloud, DevOps, and delivery process for a long-running government modernization program. Played a key role in securing a 14-year enterprise contract through architectural POCs delivered in client presentations.",
+          "6+ years of engineering leadership — leading and mentoring cross-functional teams. Direct accountability across engineering, architecture, AI integration, cloud, DevOps, and delivery process for a long-running government modernization program. Played a key role in securing a 14-year enterprise contract through architectural POCs delivered in client presentations.",
         groups: [
           {
             label: "Engineering Leadership & People",

@@ -80,11 +80,15 @@ create table if not exists blog_posts (
 -- ---------------------------------------------------------------------------
 create table if not exists analytics_events (
   id         uuid primary key default gen_random_uuid(),
-  type       text not null,        -- 'page_view' | 'resume_download' | 'blog_view'
+  type       text not null,        -- 'page_view' | 'resume_download' | 'rag_ask' | ...
   path       text,
   meta       jsonb,
   created_at timestamptz not null default now()
 );
+-- Keeps the RAG daily-budget / global-cap and retention queries fast as the
+-- table grows (they filter by type + created_at).
+create index if not exists analytics_events_type_created_at_idx
+  on analytics_events (type, created_at);
 
 -- ---------------------------------------------------------------------------
 -- RAG demo groundwork (Slice 4.5). 384-dim vectors = bge-small-en / MiniLM.

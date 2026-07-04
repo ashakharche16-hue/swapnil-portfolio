@@ -5,7 +5,7 @@ const clean = (s: string) => s.replace(/\*\*|__|`/g, "").trim();
 
 /**
  * Assembles a plain-text profile of the owner from the live site content, for
- * the "Ask about Swapnil" recruiter mode. Always in sync with what's edited in
+ * the "Ask about Swapnil" mode. Always in sync with what's edited in
  * /admin. Kept compact so it fits comfortably in the model context.
  */
 export function buildProfileContext(content: PublicSite): string {
@@ -66,7 +66,7 @@ export function buildProfileContext(content: PublicSite): string {
   return out.join("\n");
 }
 
-/** Starter questions a recruiter might ask. */
+/** Starter questions a visitor might ask. */
 export const PROFILE_SUGGESTIONS = [
   "How many years of engineering leadership experience does he have?",
   "What's his experience with AWS and cloud-native systems?",
