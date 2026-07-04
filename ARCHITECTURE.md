@@ -51,7 +51,7 @@ and slice plan see [`CLAUDE.md`](./CLAUDE.md).
 
 **Reading path:** components → `services/*` → Supabase (anon key, RLS-enforced).
 **Writing path:** admin editors → server actions → Supabase (service-role key).
-Components never touch Supabase directly — see [§5](#5-data-layer).
+Components never touch Supabase direc tly — see [§5](#5-data-layer).
 
 ---
 
@@ -159,14 +159,6 @@ differing fields. `services/content.ts` assembles these into a typed
 - **No sign-up UI** — accounts are created by the owner in Supabase only.
 - **Secrets boundary** — service-role, Groq, Resend keys are server-only; only
   `NEXT_PUBLIC_*` reach the browser.
-- **Row-Level Security (defense at the database).** RLS is enabled on every
-  table. The public **anon key** (shipped to the browser) can only **read**
-  `profile`, `sections`, and published `blog_posts` — nothing else. All
-  sensitive tables (`contact_submissions`, `analytics_events`, and every
-  `rag_*` table) have **no anon policy at all**, so uploaded documents, their
-  chunks, conversations, and submissions are **never readable or writable with
-  the public key** — every write/read goes through a guarded server route using
-  the service role. See [`SECURITY.md`](./SECURITY.md) for the full threat model.
 
 ---
 
@@ -185,23 +177,6 @@ Upload ─▶ extract text ─▶ chunk ─▶ embed (local) ─▶ store vector
 Ask ─▶ [cache?] ─▶ condense ─▶ embed ─▶ vector search ─▶ rerank ─▶ Groq ─▶ stream
         cache.ts    (if history)         match_chunks    cross-enc   answer + cite
 ```
-
-### Two modes (`/rag`)
-
-A toggle offers two experiences:
-
-- **Ask about Swapnil** (default) — no upload. The whole owner profile is
-  assembled from the **live DB content** (`lib/rag/profile-context.ts`) and used
-  as context, so answers stay in sync with `/admin` edits. Served by
-  `/api/rag/ask-profile` (same guards; in-memory answer cache; no vector store
-  needed since the profile is small).
-- **Chat with a document** — upload a PDF/image and ask about it (the pipeline
-  above), served by `/api/rag/ask`.
-
-**Small documents skip retrieval.** If a document's full text is ≤
-`RAG_FULLDOC_CHARS`, the **whole document** is used as context (like a file
-upload) so whole-document questions ("who is this about?", "summarize") work;
-larger docs fall back to retrieval and always include the header chunk.
 
 ### Component choices — _why each_
 
@@ -246,24 +221,17 @@ Because Groq's free tier is finite, the demo is engineered to stay within it:
 
 - **Context trimming** — fewer/shorter chunks and limited history bound _input_
   tokens; `max_tokens` bounds output.
-- **Per-IP rate limits** — on both questions (`checkQuestionRate`) and uploads
-  (`checkIngestRate`, since parsing/OCR/embedding is heavy) — stops one visitor
-  draining the quota.
+- **Per-IP rate limit** — stops one visitor draining the quota.
 - **Global daily token budget** — once today's logged tokens exceed the budget,
   answering pauses (upload/search still work). Usage is logged to
   `analytics_events` (`type='rag_ask'`) — which doubles as observability.
-- **Hard global daily ask cap** (`RAG_MAX_ASKS_PER_DAY_GLOBAL`) — a fail-safe
-  ceiling on answered questions across _all_ users, so no traffic volume can
-  exhaust the free tiers. Analytics are pruned (>90 days) so the DB stays small.
-- **Answer cache** (`rag_answer_cache` for docs; in-memory for profile) —
-  first-turn questions are cached; identical repeats return instantly with
-  **zero tokens** and bypass the budget. Only first-turn (context-free)
-  questions are cached, to avoid serving a wrong answer to a follow-up.
+- **Answer cache** (`rag_answer_cache`) — first-turn questions are cached per
+  document; identical repeats return instantly with **zero tokens** and bypass
+  the budget. Only first-turn (context-free) questions are cached, to avoid
+  serving a wrong answer to a context-dependent follow-up.
 
 _Why these mirror the contact-form guards:_ same philosophy — never lose the
-core action, only throttle the expensive side effect. The net effect: **the demo
-degrades gracefully (429 / "try again tomorrow") instead of ever spending
-money**, no matter how many users connect. See [`SECURITY.md`](./SECURITY.md).
+core action, only throttle the expensive side effect.
 
 ---
 
@@ -335,132 +303,3 @@ cosine similarity within one document.
   editor and easy reordering** — mitigated by shared TypeScript types.
 - **"Any authenticated user = admin" default** trades simplicity for a small
   risk, closed by disabling sign-ups and/or setting `ADMIN_EMAILS`.
-
----
-
-## 13. Key sequences
-
-### 13.1 Contact submit
-
-Store-first, email-second, with honeypot + per-IP rate limit + send caps. The
-message is never lost even if email is skipped; the admin reads it from the DB.
-
-```
-Visitor   ContactForm(client)   /api/contact(Node)     Supabase           Resend
-  │   fill + blur email │  validate '@'/format │            │                │
-  │   submit ──────────▶│                      │            │                │
-  │                     │ POST {name,email,    │            │                │
-  │                     │  message, company} ─▶│            │                │
-  │                     │        (company=honeypot)         │                │
-  │                     │              honeypot filled? ─▶ return 200 (drop)  │
-  │                     │              validate + length + email              │
-  │                     │              derive IP (x-forwarded-for)            │
-  │                     │              count recent by IP ─▶│ contact_submissions
-  │                     │              over limit? ◀────────│                │
-  │                     │              └─ yes ─▶ 429 "slow down"              │
-  │                     │              insert submission ──▶│ (retry w/o ip   │
-  │                     │                                   │  if not migrated)│
-  │                     │              count today/month ──▶│                │
-  │                     │              under caps? send ────┼───────────────▶│ email owner
-  │                     │                            ok ◀───┼────────────────│ (replyTo sender)
-  │                     │ ◀ {ok:true} | {error,status} ─────│                │
-  │ ◀ "Message sent" / inline error                        │                │
-                          … later …
-  Owner ─▶ /admin/inbox ─▶ services/inbox.getSubmissions ─▶ Supabase (read + mark/delete)
-```
-
-Key point: the honeypot short-circuits before any DB/email work; caps gate only
-the **email**, never the **insert**.
-
-### 13.2 RAG ask (with cache)
-
-Local ML does extraction/embedding/reranking; Groq is called only on a cache
-miss. First-turn answers are cached for zero-token repeats.
-
-```
-Visitor  RagDemo(client)  /api/rag/ask(Node)     Supabase(pgvector)  local ML     Groq
-  │  type Q │                    │                      │              │           │
-  │  send ─▶│ POST {documentId,  │                      │              │           │
-  │         │  sessionId, q} ───▶│                      │              │           │
-  │         │        GROQ key? admin? validate q(≤500)  │              │           │
-  │         │        derive IP → per-IP rate limit ───▶ │ analytics_events         │
-  │         │        ◀ 429 if over                      │ (rag_ask)    │           │
-  │         │        load history ────────────────────▶ │ rag_messages │           │
-  │         │        first turn (no history)?           │              │           │
-  │         │         └─ yes: cache lookup ───────────▶ │ rag_answer_cache         │
-  │         │            HIT ─▶ save turn + return cached (0 tokens, bypass budget) │
-  │ ◀ answer + citations (X-Rag-Cache: hit) ◀───────────│              │           │
-  │         │         MISS ▼                            │              │           │
-  │         │        token-budget check ──────────────▶ │ sum today    │           │
-  │         │        ◀ 503 if over budget               │              │           │
-  │         │        condense follow-up (only if history) ───────────────────────▶ │ 8b
-  │         │        embed query ────────────────────────────────────▶ │ Transformers│
-  │         │        match_chunks(top 20) ────────────▶ │ vector search│           │
-  │         │        rerank → keep N ─────────────────────────────────▶│ cross-enc │
-  │         │        build context + injection-safe prompt              │           │
-  │         │        stream answer ──────────────────────────────────────────────▶ │ 70b
-  │ ◀ tokens stream in (SSE-style body) ◀───────────────│              │  tokens ◀─│
-  │         │        on finish: read usage → logAsk ──▶ │ analytics_events         │
-  │         │                   cache first-turn answer ▶│ rag_answer_cache         │
-  │         │                   save user+assistant ────▶│ rag_messages │           │
-```
-
-Key points: **rate limit** applies to every call (incl. cache hits); the
-**token budget** is checked only on a miss (a hit costs nothing); citations ride
-back in the base64 `X-Rag-Sources` header alongside the streamed body.
-
-### 13.3 Admin edit
-
-Gated read → edit → server-action write (auth + allowlist re-checked) →
-`revalidatePath` so the public site is fresh on the next load. No rebuild.
-
-```
-Owner   Browser            middleware       Server (page + action)        Supabase
-  │  GET /admin/* ─────────▶│ session?      │                             │
-  │                         │ none ─▶ redirect /login                      │
-  │  sign in (email+pw) ────┼──────────────▶ Supabase Auth ─▶ sets cookie  │
-  │  open editor ──────────▶│ admin? ─▶ ok  │ page (server, force-dynamic) │
-  │                         │               │ getSectionForAdmin /         │
-  │                         │               │ getProfileForAdmin ────────▶ │ service-role READ
-  │  ◀ editor prefilled with current data ──│ ◀───────────────────────────│
-  │  edit fields, click Save ──────────────▶│ server action                │
-  │                         │               │ getAdminUser (auth+allowlist)│
-  │                         │               │  └─ not allowed ─▶ {error}    │
-  │                         │               │ update/upsert row ─────────▶ │ service-role WRITE
-  │                         │               │ revalidatePath('/', editor)  │
-  │  ◀ {ok:true} "Saved — live now" ────────│                             │
-  │                    … next visitor load …                              │
-  Visitor ─▶ (public) page (force-dynamic) ─▶ services/content ─▶ Supabase (anon READ) ─▶ fresh
-```
-
-Key points: reads use the service role behind the auth gate; **writes re-verify
-`getAdminUser` inside the action** (not just middleware); `revalidatePath`
-refreshes the dynamic public page without a deploy.
-
-### 13.4 RAG ingest
-
-Extraction + chunking + embedding run **locally**; the only hosted call is a
-small Groq utility to propose starter questions (cached with the document).
-
-```
-Visitor  RagDemo(client)  /api/rag/ingest(Node)     local ML          Groq(8b)   Supabase
-  │ choose file │                 │                     │                │          │
-  │ upload ────▶│ POST FormData(file) ─▶               │                │          │
-  │             │      validate size (≤10MB) + type     │                │          │
-  │             │        (PDF / PNG / JPG / WebP)       │                │          │
-  │             │      extractFromFile ───────────────▶ │ unpdf (text PDF)          │
-  │             │                                       │ tesseract (image OCR)     │
-  │             │      ◀ pages[] of text                │                │          │
-  │             │      chunkPages ─▶ chunks[] (+page)   │                │          │
-  │             │      embed each chunk ──────────────▶ │ Transformers (bge-small)  │
-  │             │      suggestQuestions (in parallel) ──┼───────────────▶│ 3 starters
-  │             │      insert rag_documents (+suggested) ┼───────────────┼─────────▶│
-  │             │      insert rag_chunks (content, page, vector) ────────┼─────────▶│
-  │             │ ◀ {documentId, pageCount, chunks, kind, suggestions}   │          │
-  │ ◀ ready — show suggested questions; persist docId + session (localStorage)      │
-```
-
-Key points: **no Groq tokens for embeddings** (local); parsing/embedding are the
-slow part (first run also downloads the models); `suggested` questions are
-computed once here and stored on the document, so the ask path never regenerates
-them. Documents auto-expire after 24h, cascading to chunks, messages, and cache.
