@@ -131,6 +131,20 @@
     }
   }
 
+  /* Standalone sub-pages (e.g. /rag) that sit under the sticky top bar without
+     a hero. Matches the hero's vertical rhythm so top spacing is consistent
+     site-wide. */
+  .subpage {
+    padding-top: 96px;
+    padding-bottom: 96px;
+  }
+  @media (max-width: 640px) {
+    .subpage {
+      padding-top: 64px;
+      padding-bottom: 64px;
+    }
+  }
+
   /* ---- Type ---- */
   .display {
     font-family: var(--font-fraunces), Georgia, serif;
